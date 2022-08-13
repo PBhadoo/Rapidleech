@@ -7,7 +7,7 @@ if (count(get_included_files()) == 1) {
 }
 
 @set_time_limit(0);
-@ini_set('memory_limit', '4096M');
+@ini_set('memory_limit', '1024M');
 if (ini_get('zlib.output_compression')) @ini_set('zlib.output_compression', 0);
 if (ob_get_level()) ob_end_clean();
 ob_implicit_flush(true);
@@ -27,7 +27,7 @@ define('HOST_DIR', 'hosts/');
 define('CLASS_DIR', 'classes/');
 define('CONFIG_DIR', 'configs/');
 define('BUILD', '30May2011');
-define('CREDITS', '<a href="https://rzp.io/l/rapidleech" target="_blank"><img src="https://i1.wp.com/www.ymca.int/wp/wp-content/uploads/logo-donation.jpg" alt="Donate"></a><br><br><a href="https://github.com/PBhadoo/Rapidleech" class="rl-link"><b>RapidLeech</b></a>&nbsp;<b class="rev-dev">PlugMod (eqbal) rev. ' . $rev_num . '</b> <span class="rev-dev">' . $dev_name . '</span><br><small class="small-credits">Bhadoo Cloud Cyber Systems and Tesseract Corporation</small><br><a href="https://hits.seeyoufarm.com"><img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Frapidleech.hashhackers.com&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false"/></a><br><small class="small-credits">For DMCA contact dmca@hashhackers.com, please allow 48 hours to process DMCA requests.</small>');
+define('CREDITS', '<a href="https://rzp.io/l/rapidleech" target="_blank"><img src="https://i1.wp.com/vtsbharath.org/wp-content/uploads/2016/04/Donate-Banner.jpg" alt="Donate"></a><br><a href="https://github.com/Th3-822/rapidleech" class="rl-link"><b>RapidLeech</b></a>&nbsp;<b class="rev-dev">PlugMod (eqbal) rev. ' . $rev_num . '</b> <span class="rev-dev">' . $dev_name . '</span><br><small class="small-credits">Bhadoo Cloud Cyber Systems and Tesseract Corporation</small><br><a href="https://hits.seeyoufarm.com"><img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Frapidleech.hashhackers.com&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false"/></a><br><small class="small-credits">For DMCA contact dmca@hashhackers.com, please allow 48 hours to process DMCA requests.</small>');
 
 require_once(CONFIG_DIR . 'setup.php');
 

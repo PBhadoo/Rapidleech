@@ -1,6 +1,309 @@
                 RAR - What's new in the latest version
 
 
+   Version 6.12
+
+   1. Security vulnerability allowing to create unpacked files outside
+      of destination directory is fixed. This issue exists in Unix RAR only
+      and doesn't affect WinRAR and Android RAR.
+
+      We are thankful to Simon Scannell from SonarSource for reporting it.
+
+
+   Version 6.11
+
+   1. Switch -mes can be also used to suppress the password prompt
+      and abort when adding files to encrypted solid archive.
+
+   2. Additional measures to prevent extracting insecure links are
+      implemented.
+
+   
+   Version 6.10
+   
+   1. Switch -si can be used when extracting or testing to read archive
+      data from stdin, such as: 
+
+        cat docs.rar | rar x -si -o+ -pmypwd dummy docs/
+
+      Even though the archive name is ignored with this switch,
+      an arbitrary dummy archive name has to specified in the command line.
+            
+      Operations requiring backward seeks are unavailable in this mode.
+      It includes displaying archive comments, testing the recovery record,
+      utilizing the quick open information, processing multivolume archives.
+
+      Prompts requiring user interaction are not allowed.
+      Use -o[+|-|r], -p<pwd> or -mes switches to suppress such prompts.
+   
+   2. New -ep4<path> switch excludes the path prefix when archiving
+      or extracting if this path is found in the beginning of archived name.
+      Path is compared with names already prepared to store in archive,
+      without drive letters and leading path separators. For example:
+
+        rar a -ep4texts/books archive /texts/books/technical
+
+      removes "text/books" from archived names, so they start
+      from 'technical'.
+   
+   3. New -mes switch skips encrypted files when extracting or testing.
+      It replaces former -p- switch.
+
+   4. New -op<path> switch sets the destination directory for 'x' and 'e'
+      extraction commands. Unlike <path_to_extract/> command line parameter,
+      this switch also accepts paths without trailing path separator
+      character.
+
+   5. If 'p' command is used to print a file to stdout, informational
+      messages are suppressed automatically to prevent them mixing
+      with file data.
+
+   6. "Generate archive name by mask" option and switch -ag treat only
+      first two 'M' characters after 'H' as minutes. Previously any
+      amount of such characters was considered as minutes.
+
+      It makes possible to place the time field before the date,
+      like -agHHMM-DDMMYY. Previous versions considered all 'M'
+      in this string as minutes.
+
+   7. Maximum allowed size of RAR5 recovery record is increased to 1000%
+      of protected data size. Maximum number of RAR5 recovery volumes
+      can be 10 times larger than protected RAR volumes.
+
+      Previous WinRAR versions are not able to use the recovery record
+      to repair broken archives if recovery record size exceeds 99%.
+      Similarly, previous versions cannot use recovery volumes
+      if their number is equal or larger than number of RAR volumes.
+
+   8. Warning is issued if entered password exceeds the allowed limit
+      of 127 characters and is truncated. Previously such passwords
+      had been truncated silently.
+
+   9. Command line -en switch is not supported anymore.
+      It created RAR4 archives without the end of archive record.
+
+      End of archive record permits to gracefully skip external data
+      like digital signatures.
+
+  10. Bugs fixed:
+
+      1) the total progress could be displayed incorrectly when using
+         -oi, -f, -u switches or appropriate GUI options.
+
+   
+   Version 6.02
+
+   1. Switch -idn hides archived names also in 'v' and 'l' commands.
+      It can be useful if only the archive type or total information
+      is needed.
+   
+   2. Bugs fixed:
+
+      a) after archiving data including a lot of directories,
+         Unix RAR could display less than 100% total progress percent,
+         even though it added all specified files and directories to archive.
+
+   
+   Version 6.01
+
+   1. If -idn switch is used together with -t or -df in console RAR
+      when archiving, it additionally disables "Deleting <filename>"
+      or "Testing <filename>" messages, normally issued by these switches.
+
+      Also -idn disables directory creation messages when extracting
+      a file to non-existing directory.
+
+   
+   Version 6.00
+
+   1. "Ignore" and "Ignore All" options are added to read error prompt.
+      "Ignore" allows to continue processing with already read file part
+      only and "Ignore All" does it for all future read errors.
+
+      For example, if you archive a file, which portion is locked by another
+      process, and if "Ignore" is selected in read error prompt,
+      only a part of file preceding the unreadable region will be saved
+      into archive.
+
+      It can help to avoid interrupting lengthy archiving operations,
+      though be aware that files archived with "Ignore" are incomplete.
+      
+      If switch -y is specified, "Ignore" is applied to all files by default.
+
+      Previosuly available "Retry" and "Quit" options are still present
+      in read error prompt as well.
+
+   2. Exit code 12 is returned in case of read errors. This code is returned
+      for all options in the read error prompt, including a newly introduced
+      "Ignore" option.
+
+      Previously more common fatal error code 2 was returned for read errors.
+
+   3. New -ad2 switch places extracted files directly to archive's own folder.
+      Unlike -ad1, it does not create a separate subfolder for each unpacked
+      archive.
+
+   4. When unpacking a part of files from solid volume set, RAR attempts to
+      skip volumes in the beginning and start extraction from volume closest
+      to specified file and with reset solid statistics.
+
+      By default RAR resets the solid statistics in the beginning
+      of large enough solid volumes where possible. For such volumes
+      extracting a part of files from the middle of volume set can be
+      faster now.
+
+      It does not affect performance when all archived files are unpacked.
+
+   5. Previously RAR automatically resorted to extracting from first volume,
+      when user started extraction from non-first volume and first volume
+      was available. Now RAR does so only if all volumes between first
+      and specified are also available.
+
+   6. Switch -idn hides archived names output in archiving, extraction
+      and some other commands. Other messages and total percentage
+      are not affected.
+
+      You can use this switch to reduce visual clutter and console output
+      overhead when archiving or extracting a lot of small files.
+
+      Minor visual artifacts, such as percentage indicator overwriting
+      few last characters of error messages, are possible with -idn.
+
+   7. Switch -mci is removed. Optimized compression of Itanium executables
+      is not supported anymore. RAR still can decompress already existing
+      archives utilizing Itanium executable compression.
+
+   
+   Version 5.91
+
+   1. Bugs fixed:
+
+      a) Unix RAR failed to properly unpack files from subfolders of
+         archives created by RAR 1.40.
+
+   
+   Version 5.90
+   
+   1. RAR compression speed is improved for CPUs with 16 and more cores.
+
+   2. "Fastest" method (-m1 command line equivalent) typically achieves
+      a higher compression ratio for highly compressible data types
+      when creating RAR5 archives.
+
+   3. Maximum number of utilized threads is increased from 32 to 64.
+      Command line -mt<threads> switch accepts values from 1 to 64.
+         
+   4. "Repair" performance for RAR5 archives with recovery record
+      and without data shifts is improved. It deteriorated in RAR 5.80
+      and is now restored to original level.
+
+   5. Password prompt is not issued when performing recovery record based
+      repair for RAR5 archives with encrypted file names.
+      This command can be performed without providing a password.
+
+   6. Bugs fixed:
+
+      a) "Repair" command could erroneously display "Recovery record is
+         corrupt" message when processing an archive with valid recovery
+         record. This message did not prevent further repair operation.
+
+   
+   Version 5.80
+   
+   1. It is allowed to combine several modifiers in the same -ts switch.
+      For example, we can use -tsca instead -tsc -tsa.
+
+   2. Command line -agf<default_format> switch specifies the default format
+      string for -ag switch. It has a practical value only if placed to
+      rar.ini configuration file or to RAR environment variable.
+      For example, if we set RAR environment variable to -agfYYYY-MMM-DD,
+      we can use -ag without a parameter with YYYY-MMM-DD format string
+      assumed.
+
+   3. Switches -ed and -e+d can be used in archive processing commands
+      for any combination of RAR and archive operating systems.
+      In older versions RAR for Windows could not use them for Unix RAR
+      archives also as RAR for Unix for Windows RAR archives.
+
+   4. Similarly to RAR5 volumes, recovery volumes in RAR4 format use
+      the same width of volume number field as corresponding RAR volumes.
+      While previously RAR could create arc.part01.rar and arc.part1.rev
+      in RAR4 format, now both types of volumes will use "part01".
+
+   5. "Find string in archives" "i" command:
+
+      a) if "t" modifer is used, additionally to already supported
+         ANSI, OEM and UTF-16 encodings RAR will search the specified string
+         in UTF-8 files as well;
+      
+      b) better performance, especially for case insensitive search;
+
+      c) hexadecimal search output includes both text and hexadecimal
+         representation of found matches.
+
+   6. Bugs fixed:
+
+      a) previous RAR version failed to unpack folder records
+         in archives created by RAR 1.50.
+      
+
+   Version 5.71
+   
+   1. Ctrl+C allows to abort RAR "l" command quickly. In previous versions
+      it could take several seconds until list command stopped.
+
+   2. Bugs fixed:
+
+      a) in "RAR x -x<mask> arcname" command, parent directories of files
+         matching the specified mask also were excluded from extracting.
+
+   
+   Version 5.70
+
+   1. Command line -ta, -tb, -tn, -to switches accept 'm', 'c' and 'a'
+      modifiers after the switch name. So file time conditions can include
+      not only the file modification time as in previous versions,
+      but also creation (ctime "change time" for Unix) and last access time.
+
+      Such switch can include multiple modifiers to set the same date
+      for all specified times. For example, -tamc20190215 will process files
+      modified and created after 2019-02-15. 
+      
+      New 'o' modifier permits to switch from AND to OR logic,
+      so -tamco20190215 includes files modified or created after 2019-02-15.
+      It is also allowed to specify several time filtering switches
+      with different dates in the same command line, like:
+      -taco20190201 -tbmo20190210
+
+      Switches -ta and -tn also include files matching the specified date
+      exactly. Switches -tb and -to exclude such files.
+
+   2. New -ad1 switch can be used when unpacking multiple archives
+      recursively, such as 'rar x -r -ad1 arc\*.rar'. It creates
+      a separate folder for files unpacked from each archive,
+      but unlike already existing -ad switch, it creates such folders
+      in each archive folder.
+
+   3. Bugs fixed:
+
+      a) RAR mixed up source and destination file sizes and times
+         in the overwrite prompt when updating a file in RAR archive
+         with -o switch;
+
+      b) commands modifying an existing RAR4 volume reset the volume number
+         field to 1. While it did not affect extraction, tools like WinRAR
+         displayed a wrong volume number for such volumes;
+
+      c) fixed a crash when reading an archive comment from a corrupt
+         RAR file.
+
+
+   Version 5.61
+
+   1. Fixed a crash when processing corrupt RAR archives.
+      This issue may be also associated with security risks.
+
+   
    Version 5.60
 
    1. "Repair" command efficiency is improved for recovery record protected
@@ -393,115 +696,3 @@
        parameter defining the destination folder for repaired archive:
 
        rar r archive.rar destpath\
-
-   
-   Version 4.20
-
-   1. Changes in RAR compression:
-
-      a) Multithreaded RAR compression is enabled by default.
-         You can disable it with -mt1 switch.
-
-         Comparing to RAR 4.11, some speed gain is possible
-         in single processor mode as well.
-
-         Speed gain depends on data type and average file size.
-         Several cores are utilized more efficiently when compressing
-         large files.
-
-      b) we had to increase memory requirements to achieve higher
-         compression speed. General RAR compression algorithm allocates
-         about 120 MB comparing to 40 MB in RAR 4.11;
-
-      c) RAR text compression algorithm cannot utilize several CPU cores
-         efficiently, so its performance in multiprocessor environment
-         is much lower than for general algorithm. Also its decompression
-         speed is much lower than in general algorithm regardless of
-         CPU number. So we decided to disable the text algorithm by default.
-
-         If you need maximum possible compression ratio for plain text data
-         regardless of speed, you can enable the text compression
-         with -mct switch.
-
-   2. RAR general decompression algorithm speed is slightly improved,
-      though not to same extent as RAR compression. RAR decompression
-      is not able to use several processor cores, so its performance
-      does not depend on a number of cores.
-
-
-   Version 4.11
-
-   1. Bugs fixed:
-
-      a) if -x*\somedir\* exclusion mask was specified when archiving 
-         and if name of current directory contained 'somedir', RAR could
-         exclude all files and stop creating an archive.
-
-
-   Version 4.10
-
-   1. Modifications of switch -ag behavior:
-
-      a) -ag can be used with all RAR commands, not just with archiving only;
-
-      b) 'N' format character behavior differs in archiving and non-archiving
-         operations. When archiving, it is incremented until the first unused
-         name is found. In non-archiving operations like extracting it selects
-         the existing archive preceding the first unused name;
-
-      c) 'I' format character allows to specify minutes regardless of presence
-         and position of 'H' (hours) in format string. It can be used
-         instead of 'M' (minutes), when you wish to place minutes before
-         hours or do not need hours at all.
-
-   2. New -log[fmt][=name] switch allows to write archive and file names
-      to log file in archiving, extracting, deleting and listing commands.
-      This switch is especially useful, when you need to further process
-      an archive created with -ag or -v switches, because -log provides
-      the archive name generated by RAR.
-  
-   3. New -@[+] switch allows to process all parameters starting from
-      '@' character either as file names (-@) or as file lists (-@+).
-
-   4. Volume size in -v<size> switch can be specified as a decimal fraction.
-      Dot (.) is used as the decimal mark. For example, -v1.5g means
-      1.5 gigabytes.
-
-   
-   Version 4.01
-
-   1. Bugs fixed:
-
-      a) "Repair" command failed to properly reconstruct structure
-         of RAR archives, which contained at least one file with packed
-         size exceeding 4 GB.
-
-         This bug did not affect the recovery record based repair.
-         It happened only if recovery record was not found and RAR
-         performed reconstruction of archive structure;
-
-      b) RAR could crash when creating a new archive with -agNNNN switch
-         if archive number in generated name was very large,
-         like a thousand or more.
-
-
-   Version 4.00
-
-   1. RAR decompression speed is improved. Depending on data type,
-      decompression can be up to 30% faster than in previous versions.
-
-      Both the general RAR algorithm and most of special RAR multimedia
-      methods benefit from this improvement. The only module of RAR
-      algorithm, which is not affected, is "Text compression" method.
-   
-   2. Changes in -x<file> switch syntax. Now you can specify a wildcard
-      exclusion mask for folders. Such mask must have the trailing '\'
-      character, like -x*tmp*\ or -x*\temp\
-
-   3. Recovery volume processing involves less disk seek operations
-      resulting in higher performance.
-
-   4. New error code 10 ("no files") is added to list of error codes.
-      This new code can be returned by archive, extract, delete
-      and repair commands. It means that RAR did not find any files
-      matched the specified file or archive mask.

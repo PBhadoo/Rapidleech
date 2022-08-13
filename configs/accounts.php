@@ -6,6 +6,7 @@ $premium_acc = array();
 //$premium_acc["rapidshare_com"] = array('user' => 'your username', 'pass' => 'your password');
 // For multiple rapidshare premium accounts only - if you are using multiple accounts below, comment out the line above
 //$premium_acc["rapidshare_com"] = array(array('user' => 'your username1', 'pass' => 'your password1'),array('user' => 'your username2', 'pass' => 'your password2'),array('user' => 'your username3', 'pass' => 'your password3'));
+//$premium_acc["mega_co_nz"] = array('user' => 'users@hashhackers.com', 'pass' => 'QDfYOBQn-6uD6?[m0Y9&jMYpXez4I7');
 //$premium_acc["netload_in"] = array('user' => 'your username', 'pass' => 'your password');
 //$premium_acc["cramit_in"] = array('user' => 'your username', 'pass' => 'your password');
 //$premium_acc["megashare_com"] = array('user' => 'your username', 'pass' => 'your password');

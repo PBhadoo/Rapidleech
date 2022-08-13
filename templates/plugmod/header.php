@@ -9,7 +9,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link title="Rapidleech Style" href="templates/plugmod/styles/rl_style_pm.css" rel="stylesheet" type="text/css" />
 
-<title>Rapidleech by Hash Hackers</title>
+<title>Rapidleech - Hash Hackers</title>
 <script type="text/javascript">
 /* <![CDATA[ */
 var php_js_strings = [];
@@ -28,4 +28,4 @@ if ($GLOBALS['options']['flist_sort']) { echo '<script type="text/javascript" sr
 </head>
 
 <body>
-<center><a href="//telegram.dog/HashHackers"><img src="https://images.cdn.hashhackers.com/logo/logo-white-d.svg" alt="Hash Hackers" border="0" height="40px" style="margin-top: 10px;"></a></center><br />
+<center><a href="/"><img src="https://images.cdn.hashhackers.com/logo/logo-white-d.svg" alt="Hash Hackers" border="0" height="40px" style="margin-top: 10px;"></a></center><br />

@@ -1,6 +1,6 @@
                              User's Manual
                              ~~~~~~~~~~~~~
-                        RAR 5.60 console version
+                        RAR 6.12 console version
                         ~~~~~~~~~~~~~~~~~~~~~~~~
 
                        =-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -37,7 +37,7 @@
   RAR and UnRAR for Windows read configuration information from rar.ini file,
   placed in the same directory as the rar.exe file.
 
-  This file may contain the following string:
+  This file can contain the following string:
 
   switches=<any RAR switches separated by spaces>
 
@@ -69,7 +69,7 @@
       export RAR
 
     RAR will use this string as default parameters in the command line and
-    will create "solid" archives with 1024 KB sliding dictionary size.
+    will create "solid" archives with 1024 MB sliding dictionary size.
 
     RAR handles options with priority as following:
 
@@ -81,10 +81,10 @@
  Log file
  ~~~~~~~~
 
-  If the switch -ilog is specified in the command line or configuration
-  file, RAR will write informational messages, concerning errors
-  encountered while processing archives, into a log file. Read switch
-  -ilog description for more details.
+  If switch -ilog is specified in the command line or configuration file,
+  RAR will write informational messages about errors encountered while
+  processing archives into a log file. Read the switch -ilog description
+  for more details.
 
 
  The file order list for solid archiving - rarfiles.lst
@@ -124,17 +124,15 @@
 
  Description
 
-    Command line options (commands and switches) provide control of
-    creating and managing archives with RAR. The command is a string (or a
-    single letter) which commands RAR to perform a corresponding action.
-    Switches are designed to modify the way RAR performs the action. Other
-    parameters are archive name and files to be archived into or extracted
-    from the archive.
+    Command is a single character or string specifying an action to be
+    performed by RAR. Switches are designed to modify the way RAR performs
+    such action. Other parameters are archive name and files to be archived
+    or extracted.
 
-    Listfiles are plain text files that contain names of files to process.
-    File names should start at the first column. It is possible to
+    Listfiles are plain text files containing names of files to process.
+    File names must start at the first column. It is possible to
     put comments to the listfile after // characters. For example,
-    you may create backup.lst containing the following strings:
+    you can create backup.lst containing the following strings:
 
     c:\work\doc\*.txt         //backup text documents
     c:\work\image\*.bmp       //backup pictures
@@ -150,9 +148,15 @@
     By default, console RAR uses the single byte encoding in list files,
     but it can be redefined with -sc<charset>l switch.
 
-    You may specify both usual file names and list files in the same
+    You can specify both usual file names and list files in the same
     command line. If neither files nor listfiles are specified,
     then *.* is implied and RAR will process all files.
+
+    path_to_extract includes the destination directory name followed by
+    a path separator character. For example, it can be c:\dest\ in Windows
+    or data/ in Unix. It specifies the directory to place extracted files
+    in 'x' and 'e' commands. This directory is created by RAR if it does not
+    exist yet. Alternatively it can be set with -op<path> switch.
 
     Many RAR commands, such as extraction, test or list, allow to use
     wildcards in archive name. If no extension is specified in archive
@@ -190,7 +194,7 @@
 
             3) as a special exception, if directory name is specified as
             an argument and if directory name does not include file masks
-            and trailing backslashes, the entire contents of the directory
+            and trailing path separator, the entire contents of the directory
             and all subdirectories will be added to the archive even
             if switch -r is not specified.
 
@@ -199,7 +203,7 @@
 
             rar a Pictures.rar Bitmaps
 
-            4) if directory name includes file masks or trailing backslashes,
+            4) if directory name includes the trailing path separator,
             normal rules apply and you need to specify switch -r to process
             its subdirectories.
 
@@ -273,7 +277,7 @@
 
             rar e -or html.rar *.css css\
 
-            extract all *.css files from html.rar archive to 'css' folder
+            extract all *.css files from html.rar archive to 'css' directory
             excluding archived paths. Rename extracted files automatically
             in case several files have the same name.
 
@@ -294,7 +298,8 @@
 
               h - hexadecimal search;
 
-              t - use ANSI, Unicode and OEM character tables (Windows only);
+              t - use ANSI, UTF-8, UTF-16 and OEM (Windows only)
+                  character tables;
 
             If no parameters are specified, it is possible to use
             the simplified command syntax i<string> instead of i=<string>
@@ -316,8 +321,16 @@
             in rar archives in e:\texts directory.
 
 
-    k       Lock archive. Any command which intends to change the archive
-            will be ignored.
+    k       Lock archive.
+    
+            RAR cannot modify locked archives, so locking important archives
+            prevents their accidental modification by RAR. Such protection
+            might be especially useful in case of RAR commands processing
+            archives in groups.
+
+            This command is not intended or able to prevent modification
+            by other tools or willful third party. It implements a safety
+            measure only for accidental data change by RAR.
 
             Example:
 
@@ -358,9 +371,9 @@
 
     p       Print file to stdout.
 
-            You may use this command together with -inul switch to disable
-            all RAR messages and print only file data. It may be important
-            when you need to send a file to stdout for use in pipes.
+            Send unpacked file data to stdout. Informational messages
+            are suppressed with this command, so they are not mixed
+            with file data.
 
     
     r       Repair archive. Archive repairing is performed in two stages.
@@ -371,7 +384,7 @@
             chance of successful archive reconstruction is high.
             When this stage has been completed, a new archive is created,
             named as fixed.arcname.rar, where 'arcname' is the original
-            (damaged) archive name.            
+            (damaged) archive name.
 
             If broken archive does not contain a recovery record or if
             archive is not completely recovered due to major damage,
@@ -400,8 +413,12 @@
 
 
     rc      Reconstruct missing and damaged volumes using recovery volumes
-            (.rev files). You need to specify any existing volume
-            as the archive name, for example, 'rar rc backup.part03.rar'
+            (.rev files). You need to specify any existing  .rar or .rev
+            volume as the archive name.
+
+            Example:
+
+            rar rc backup.part03.rar
 
             Read 'rv' command description for information about
             recovery volumes.
@@ -462,13 +479,16 @@
             multiple damage. Maximum number of recovery sectors is 524288.
 
             Size of 4.x recovery record may be approximately determined as
-            <archive size>/256 + <number of recovery sectors>*512 bytes.
+            <archive size>/256 + <number of recovery sectors>*512 bytes
+            and cannot exceed the protected data size or 256 MB,
+            whatever is less.
 
             RAR 5.0 recovery record uses Reed-Solomon error correction codes.
             Its ability to repair continuous damage is about the same
             as for RAR 4.x, allowing to restore slightly less data than
-            recovery record size. But it is significantly more efficient
-            than RAR 4.x record in case of multiple damaged areas.
+            recovery record size. But it is more efficient than RAR 4.x
+            record in case of multiple damaged areas and shifted data
+            positions.
 
             RAR 5.0 record does not use 512 byte sectors and you can specify
             its size only as a percent of archive size. Even if '%' or 'p'
@@ -478,8 +498,7 @@
             size only approximately matches the user defined percent
             and difference is larger for smaller archives.
 
-            RAR 5.0 recovery record size cannot exceed the protecting
-            archive size, so you cannot use more than 100% as a parameter.
+            Maximum allowed RAR 5.0 recovery record size is 1000%.
             Larger recovery records are processed slower both when creating
             and repairing.
 
@@ -490,21 +509,14 @@
             After successful archive repair, you may need to create a new
             recovery record for saved files.
 
-            Both 4.x and 5.0 records are most efficient if data positions
-            in damaged archive are not shifted. If you copy an archive
-            from damaged media using some special software and if you have
-            a choice to fill damaged areas with zeroes or to cut out them
-            from copied file, filling with zeroes or any other value is
-            preferable, because it allows to preserve original data positions.
-            Still, even though it is not an optimal mode, both versions
-            of records attempt to repair data even in case of deletions
-            or insertions of reasonable size, when data positions were
-            shifted. RAR 5.0 recovery record handles deletions and insertions
-            more efficiently than RAR 4.x.
-
             If you use the plain 'rr' command without optional parameter,
             RAR will set the recovery record size to 3% of archive size
             by default.
+
+            While the recovery record improves chances to repair damaged
+            archives, it does not guarantee the successful recovery.
+            Consider combining the recovery record feature with making
+            multiple archive copies to different media for important data.
 
             Example:
 
@@ -550,13 +562,19 @@
             than media size.
 
             The optional <N> parameter specifies a number of recovery
-            volumes to create and must be less than the total number
-            of RAR volumes in the set. You may also append a percent
-            or 'p' character to this parameter, in such case the number of
-            creating .rev files will be equal to this percent taken
-            from the total number of RAR volumes. For example:
+            volumes to create. It must be less than the total number of
+            RAR volumes in the set for RAR 4.x and must not be larger
+            than tenfold amount of RAR volumes for RAR 5.0 format.
+            Values exceeding the threshold are adjusted automatically.
+
+            You may also append a percent or 'p' character to this parameter,
+            in such case the number of creating .rev files will be equal to
+            this percent taken from the total number of RAR volumes.
+            For example:
 
             rar rv15% data.part01.rar
+
+            If <N> parameter is omitted, it is set to 10%.
 
             RAR reconstructs missing and damaged volumes either when
             using 'rc' command or automatically, if it cannot locate
@@ -654,8 +672,8 @@
     Switches (used in conjunction with a command):
 
 
-    -?      Display help on commands and switches. The same as when none
-            or an illegal command line option is entered.
+    -?      Display help on commands and switches.
+            Same as none or illegal command line option are entered.
 
 
     --      Stop switches scanning
@@ -709,19 +727,33 @@
             This switch does not affect directory attributes.
 
 
-    -ad     Append archive name to destination path.
+    -ad[1,2]
+            Alternate destination path.
 
             This option may be useful when unpacking a group of archives.
-            By default RAR places files from all archives in the same
-            directory, but this switch creates a separate directory
-            for files unpacked from each archive.
 
-            Example:
+            Switches -ad and -ad1 create a separate directory for files
+            unpacked from each archive. These separate directories are
+            created in destination directory for -ad and in each archive's
+            directory for -ad1.
 
-            rar x -ad *.rar data\
+            Switch -ad2 places unpacked files directly to each archive's
+            directory. Separate directories are not created.
 
-            RAR will create subdirectories below 'data' for every unpacking
-            archive.
+            Destination directory parameter is ignored for -ad1 and -ad2
+            switches.
+
+            Examples:
+
+            1) rar x -ad *.rar data\
+
+               RAR will create subdirectories below 'data'
+               for every unpacking archive.
+
+            2) rar x -r -ad1 arc\*.rar
+
+               RAR will recursively scan 'arc' directory for *.rar archives
+               and create subdirectories in each archive's directory.
 
 
     -ag[format]
@@ -743,7 +775,7 @@
             D   - day of month
             E   - day of year
             H   - hours
-            M   - minutes (treated as minutes if encountered after hours)
+            M   - minutes (first two 'M' after hours treated as minutes)
             I   - minutes (treated as minutes regardless of hours position)
             S   - seconds
             N   - archive number. RAR searches for already existing archive
@@ -761,6 +793,14 @@
             If the first character in the format string is '+', positions
             of the date string and base archive name are exchanged,
             so a date will precede an archive name.
+
+            If the first character in the format string is 'F', the rest of
+            string specifies the default format string for -ag switch.
+            Such -agf<default_format> switch has a practical value only
+            if placed to rar.ini configuration file or RAR environment
+            variable. For example, if we set RAR environment variable to
+            -agfYYYY-MMM-DD, we can use -ag without a parameter with 
+            YYYY-MMM-DD format string assumed.
 
             The format string may contain optional text enclosed in '{'
             and '}' characters. This text is inserted into archive name.
@@ -834,7 +874,8 @@
             rar a -r -ac -ao f:backup c:\*.*
 
 
-    -ap     Set path inside archive. This path is merged to file
+    -ap<path>
+            Set path inside archive. This path is merged to file
             names when adding files to an archive and removed
             from file names when extracting.
 
@@ -855,7 +896,7 @@
             which are not present in the list of the currently added
             files, will be deleted from the archive. It is convenient to
             use this switch in combination with -u (update) to synchronize
-            contents of an archive and an archiving directory.
+            contents of archive and archiving directory.
 
             For example, after the command:
 
@@ -936,28 +977,10 @@
             remove empty directories.
 
 
-    -en     Do not add "end of archive" block
-
-            Not supported for RAR 5.0 archives.
-            
-            By default, RAR adds an "end of archive" block to the end of
-            a new or updated archive. It allows to skip external data like
-            digital signatures safely, but in some special cases it may be
-            useful to disable this feature. For example, if an archive
-            is transferred between two systems via an unreliable link and
-            at the same time a sender adds new files to it, it may be
-            important to be sure that the already received file part will
-            not be modified on the other end between transfer sessions.
-
-            This switch cannot be used with volumes, because the end
-            of archive block contains information important for correct
-            volume processing.
-
-
     -ep     Exclude paths from names. This switch enables files to be
             added to an archive without including the path information.
-            This could, of course, result in multiple files existing
-            in the archive with the same name.
+            This could result in multiple files with the same name
+            existing in the archive.
 
             If used when extracting, archived paths are ignored
             for extracted files, so all files are created in the same
@@ -1025,6 +1048,33 @@
             system files and should normally be used only for the purpose
             of backup and restore.
 
+    
+    -ep4<path>
+            Exclude the path prefix from names.
+
+            If this switch is used when archiving, the specified path
+            is excluded from archived names if it is found in the beginning
+            of such name, but does not match the entire name. Comparison
+            is performed with names already prepared to store in archive,
+            with removed drive letters and leading path separators.
+
+            For example:
+
+            rar a -ep4texts\books archive c:\texts\books\technical
+
+            removes "text\books" from archived names, so they start
+            from 'technical'. Since comparison is performed with names,
+            as they are stored in archive, we can't use -ep4c:\texts\books.
+
+            If this switch is used when extracting, it works similarly to
+            -ap<path> switch. Path is removed if it is present
+            in the beginning of archived file name. For example:
+
+            rar x -ep4texts\books archive
+
+            removes 'texts\books' from those archived paths,
+            which start from it.
+
 
     -e[+]<attr>
             Specifies file exclude or include attributes mask.
@@ -1076,7 +1126,7 @@
 
     -hp[p]  Encrypt both file data and headers.
 
-            This switch is similar to -p[p], but switch -p encrypts
+            This switch is similar to -p[pwd], but switch -p encrypts
             only file data and leaves other information like file names
             visible. This switch encrypts all sensitive archive areas
             including file data, file names, sizes, attributes, comments
@@ -1141,12 +1191,20 @@
             will add *.lst to lists.rar using BLAKE2sp for file checksums.
 
 
-    -id[c,d,p,q]
-            Disable messages.
+    -id[c,d,n,p,q]
+            Display or disable messages.
 
             Switch -idc disables the copyright string.
 
             Switch -idd disables "Done" string at the end of operation.
+
+            Switch -idn disables archived names output when creating,
+            testing or extracting an archive. It disables directory creation
+            messages when unpacking a file to non-existing directory.
+            It can affect some other archive processing commands as well.
+            It does not hide other messages and total percentage indicator.
+            Minor visual artifacts, such as percentage indicator overwriting
+            few last characters of error messages, are possible with -idn.
 
             Switch -idp disables the percentage indicator.
 
@@ -1215,17 +1273,31 @@
 
             Use -ioff or -ioff1 to turn PC off, -ioff2 to hibernate,
             -ioff3 to sleep and -ioff4 to restart. Appropriate power features
-            must be supported by operating system. Windows version only.
+            must be supported by operating system.
+
+            If several RAR copies are started with this switch,
+            PC is turned off by a copy finished last.
+            
+            Windows version only.
 
 
-    -isnd   Enable sound.
+    -isnd[-]
+            Control notification sounds.
+
+            Use -isnd to enable notification sounds and -isnd- to disable them.
 
 
     -iver   Display the version number and quit. You can run just "RAR -iver".
 
 
-    -k      Lock archive. Any command which intends to change the archive
-            will be ignored.
+    -k      Lock archive.
+    
+            Prevents accidental archive modification by RAR.
+            See the 'k' command description for details.
+
+            Example:
+
+            rar a -k final.rar srcfiles
 
 
     -kb     Keep broken extracted files.
@@ -1250,7 +1322,7 @@
                 files added to archive and extracted, deleted or listed
                 files inside of archive.
 
-            P - if log file with specified name is exist, append data
+            P - if log file with specified name exists, append data
                 to existing file instead of creating a new one.
 
             U - write data in Unicode format.
@@ -1338,7 +1410,6 @@
               C       - true color (RGB) data compression;
               D       - delta compression;
               E       - x86 executable compression;
-              I       - Intel Itanium executable compression;
               T       - text compression.
 
             RAR 5.0 archive format supports only 'D' and 'E' values.
@@ -1365,8 +1436,8 @@
             <Param2> is ignored.
 
 
-            x86 Intel executable compression, Intel Itanium executable
-            compression, true color (RGB) data compression:
+            x86 Intel executable compression, true color (RGB) data
+            compression:
 
             <Param1> and <Param2> are ignored.
 
@@ -1465,6 +1536,13 @@
             create a solid archive in RAR 5.0 format with 128 MB dictionary.
 
 
+    -me[par]
+            Set encryption parameters.
+
+            Now only "s" parameter is supported. You can use -mes switch
+            to skip encrypted files when extracting or testing.
+
+
     -ms[list]
             Specify file types to store.
 
@@ -1496,7 +1574,7 @@
     -mt<threads>
             Set the number of threads.
 
-            <threads> parameter can take values from 1 to 32.
+            <threads> parameter can take values from 1 to 64.
             It defines the recommended maximum number of active threads
             for compression algorithm also as for other RAR modules,
             which can start several threads. While RAR attempts to follow
@@ -1635,15 +1713,15 @@
 
             2) rar a -oi3:1000000 -r dummy c:\photo\*.jpg
 
-            List all duplicate *.jpg files lather than 1000000 bytes
-            found in c:\photo and its subdirectories.
+            List all duplicate *.jpg files, larger than or equal to
+            1000000 bytes, found in c:\photo and its subdirectories.
     
 
     -ol[a]  Process symbolic links as the link [absolute paths]
             
-            Save symbolic links as links, so file contents is not archived.
-            In Windows version it also saves reparse points as links.
-            Such archive entries are restored as symbolic links
+            Save symbolic links as links, so file or directory contents
+            is not archived. In Windows version it also saves reparse points
+            as links. Such archive entries are restored as symbolic links
             or reparse points when extracting.
 
             Supported both for RAR 4.x and RAR 5.0 archives in RAR for Unix
@@ -1671,12 +1749,32 @@
     -oni    Allow potentially incompatible names.
 
             While NTFS file system permits file names with trailing spaces
-            and dots, a lot of Windows programs fail to process such names
-            correctly. If this switch is not specified, RAR removes trailing
-            spaces and dots, if any, from file names when extracting.
+            and dots, also as reserved device names, a lot of Windows
+            programs fail to process such names correctly. If this switch
+            is not specified, RAR removes trailing spaces and dots, if any, 
+            from file names when extracting. It also inserts the underscore
+            character in the beginning of reserved device names, such as aux.
+
             Specify this switch if you need to extract such names as is.
+            It might be associated with compatibility or even security risks.
 
             Windows version only.
+
+    -op<path>
+            Set the output path.
+
+            Specify the directory to place extracted files in 'x' and 'e'
+            commands. This directory is created by RAR if it does not
+            exist yet.
+
+            Unlike <path_to_extract\> command line parameter, -op switch
+            also accepts paths without trailing path separator character.
+
+            Example:
+
+            rar x -opdest archive
+
+            unpacks contents of archive.rar to 'dest' directory.
 
 
     -or     Rename extracted files automatically if file with the same name
@@ -1743,15 +1841,6 @@
             set contents of psw.txt file as a password.
 
 
-    -p-     Do not query password
-
-            Do not query password for encrypted files when extracting.
-            Actually you can specify any invalid password to suppress
-            the password prompt and force RAR to issue 'incorrect password'
-            message when extracting an encrypted file. This switch just
-            sets '-' as a password.
-
-
     -qo[-|+]
             Add quick open information [none|force]
 
@@ -1770,7 +1859,7 @@
             can include an optional quick open record. Such record is
             added to the end of archive and contains copies of file names
             and other file information stored in a single continuous block
-            additionaly to normal file headers inside of archive.
+            additionally to normal file headers inside of archive.
             Since the block is continuous, its contents can be read quickly,
             without necessity to perform a lot of disk seek operations.
             Every file header in this block is protected with a checksum.
@@ -1994,17 +2083,37 @@
 
 
     -si[name]
-            Read data from stdin (standard input), when creating
-            an archive. Optional 'name' parameter allows to specify
-            a file name of compressed stdin data in the created
-            archive. If this parameter is missing, the name will be
-            set to 'stdin'.
+            Read data from stdin (standard input), when creating, extracting
+            or testing an archive. 
+            
+            When archiving, the optional 'name' parameter allows to specify
+            a file name of compressed stdin data in the created archive.
+            If this parameter is missing, the name will be set to 'stdin'.
 
-            Example:
+            When extracting, the archive name specified in the command line
+            is used only in informational messages, but actual archive data
+            is read from stdin. So any dummy archive name can be applied.
+            
+            RAR cannot perform operations requiring backward seeks
+            when reading archive data from stdin. Incomplete list of
+            features unavailable in such mode includes displaying archive
+            comments, testing the recovery record, utilizing the quick open
+            information, processing multivolume archives.
 
-            type Tree.Far | rar a -siTree.Far tree.rar
+            Any prompts requiring user interaction are not allowed with
+            -si and lead to program termination. If overwriting existing
+            files or unpacking encrypted files is possible, avoid such
+            prompts with -o[+|-|r], -p<pwd> or -mes switches.
 
-            will compress 'type Tree.Far' output as 'Tree.Far' file.
+            Examples:
+
+            1) compress 'type readme.txt' output as 'readme.rar' file
+
+            type readme.txt | rar a -sireadme.txt readme.rar
+
+            2) unpack docs.rar to 'docs' directory
+
+            type docs.rar | rar x -si -o+ -pmypwd dummy docs\
 
 
     -sl<size>
@@ -2060,8 +2169,9 @@
             deleted only if the archive had been successfully tested.
 
 
-    -ta<date>
+    -ta[m,c,a,o]<date>
             Process only files modified after the specified date.
+            Files matching the specified date exactly are also included.
 
             Format of the date string is YYYYMMDDHHMMSS.
             It is allowed to insert separators like '-' or ':' to
@@ -2071,9 +2181,26 @@
             and treated as "files modified after 0 hour 0 minutes
             0 seconds of 20 November 2001".
 
+            Use 'm', 'c', 'a' modifiers to specify modification,
+            creation (ctime in Unix) and last access time accordingly,
+            such as -tac20011120 for creation time or ctime.
+            If such modifier is omitted, the modification time is assumed.
 
-    -tb<date>
+            It is allowed to use several modifiers in the same switch,
+            such as -tamc20190215, to set the same date for all specified
+            times. Alternatively you can add several time filtering
+            switches to command line. By default, time filters use AND logic,
+            so a file must match all such filters to be processed.
+            It can be changed to OR logic with 'o' modifier, so a file will
+            have to match at least one 'o' filter. For example, use
+            -taco20190201 -tamo20190210 to include files created after
+            2019-02-01 or modified after 2019-02-10.
+
+
+    -tb[m,c,a,o]<date>
             Process only files modified before the specified date.
+            Files matching the specified date exactly are not included.
+
             Format of the switch is the same as -ta<date>.
 
 
@@ -2085,9 +2212,11 @@
             changed archive to the date of the newest file in the archive.
 
 
-    -tn<time>
-            Process files newer than the specified time period. Format
-            of the time string is:
+    -tn[m,c,a,o]<time>
+            Process files newer than the specified time period.
+            Files matching the specified time period exactly are also included.
+
+            Format of the time string is:
 
             [<ndays>d][<nhours>h][<nminutes>m][<nseconds>s]
 
@@ -2095,19 +2224,38 @@
             than 15 days and -tn2h30m to process files newer than
             2 hours 30 minutes.
 
+            Use 'm', 'c', 'a' modifiers to specify modification,
+            creation (ctime in Unix) and last access time accordingly,
+            such as -tnc2h30m for creation time or ctime.
+            If such modifier is omitted, the modification time is assumed.
 
-    -to<time>
-            Process files older than the specified time period. Format
-            of the switch is the same as -tn<time>.
+            It is allowed to use several modifiers in the same switch,
+            such as -tnmc30d, to set the same period for all specified times.
+            Alternatively you can add several time filtering switches to
+            command line. By default, time filters use AND logic,
+            so a file must match all such filters to be processed.
+            It can be changed to OR logic with 'o' modifier, so a file
+            will have to match at least one 'o' filter. For example,
+            use -tnco30d -tnmo20d to include files with creation time
+            newer than 30 days or modification time newer than 20 days.
+
+    -to[m,c,a,o]<time>
+            Process files older than the specified time period.
+            Files matching the specified time period exactly are not included.
+
+            Format of the switch is the same as -tn<time>.
 
 
-    -ts[m|c|a][+|-|1]
-            Save or restore file time (modification, creation, access).
+    -ts[m,c,a,p][+,-,1]
+            Save or restore file time (modification, creation or ctime,
+            access, preserve).
 
-            Use -tsm to save the file modification time, -tsc for creation
-            time and -tsa for last access time. Multiple -ts switches,
-            such as -tsc -tsa, are allowed. If 'm', 'c' or 'a' are not
-            specified, all three file times are assumed.
+            Use -tsm to save the file modification time. Switch -tsc saves
+            the creation time in Windows and the change time, also known
+            as ctime, in Unix. Switch -tsa saves the last access time.
+            Multiple -ts switches, such as -tsc -tsa, are allowed.
+            If 'm', 'c' or 'a' are not specified, all three file times
+            are assumed.
 
             Append '+' to store a file time with maximum possible precision.
             Concrete value depends on a operating system and file system
@@ -2115,6 +2263,10 @@
             in Unix. Append '1' to set 1 second precision or '-' to not save
             a file time. If '+', '-' or '1' are not present, '+' is assumed,
             so -ts+ and -ts both save all three high precision times.
+
+            All stored times for same file always have the same precision.
+            If different precisions are specified, such as -tsm1 -tsc+,
+            common one is selected.
 
             RAR 4.x archives always contain the modification time
             and for RAR 4.x archive -tsm- still saves the modification time
@@ -2131,12 +2283,29 @@
             By default RAR sets only the modification time for extracted files,
             even if archive contains other times. Use -ts or -ts+ when
             unpacking to set all three times, -tsc and -tsa to set
-            creation and last access times, -tsm- or -ts- to set the current
-            system time instead of modification time stored in archive.
+            creation (ctime in Unix) and last access times, -tsm- or -ts-
+            to set the current system time instead of modification time
+            stored in archive.
 
             Windows allows to set all three file times when unpacking.
             In Unix we can set the modification and last access, but not
-            creation time.
+            the change time.
+
+            Use -tsp switch to preserve the original last access file time
+            of source files when archiving. This switch attempts to keep
+            the original last access time of archiving files, but it does not
+            control which timestamps are to be stored in archive.
+            It has to be combined with other -ts switches for this purpose.
+            For example, if we wish to save the last access time to archive
+            and preserve the last access time of source files, we need
+            to use -tsa -tsp together. Switch -tsp can prevent opening
+            some files, which can be opened without it.
+
+            While -tsp is supported by RAR for Windows, it is not guaranteed
+            to work for other platforms.
+
+            It is allowed to combine several modifiers in the same switch,
+            such as -tscap instead of -tsc -tsa -tsp.
 
             Examples:
 
@@ -2151,9 +2320,11 @@
             If we wish to restore only the last access time, we should use
             -tsm- -tsa switches.
 
-            3) rar a -tsm1 -tsc1 backup
+            3) rar a -tsm1 -tsc1 -tsp backup
 
-            Store low precision modification and creation times.
+            Store low precision modification and creation or ctime times.
+            Preserve the last access time of source files.
+            Alternatively we could use -tsm1c1p instead of -tsm1 -tsc1 -tsp.
 
 
     -u      Update files. May be used with archive extraction or creation.
@@ -2180,16 +2351,13 @@
             specified volume.
 
 
-    -v<size>[k|b|f|m|M|g|G]
+    -v<size>[k|b|m|M|g|G]
             Create volumes with size=<size>*1000 [*1024 | *1].
             By default this switch uses <size> as thousands (1000) of bytes
             (not 1024 x bytes). You may also enter the size in kilobytes
             using the symbol 'k', in bytes using the symbol 'b',
             megabytes - 'm', millions of bytes - 'M', gigabytes - 'g',
-            billions (milliards) of bytes - 'G' or select one of several
-            predefined values using the symbol 'f' following the numerical
-            value. Predefined values can be 360, 720, 1200, 1440 or 2880
-            and replaced with corresponding floppy disk size.
+            billions (milliards) of bytes - 'G'.
 
             If the size is omitted, autodetection will be used.
 
@@ -2236,7 +2404,7 @@
 
              Cannot find <volume name>
 
-            Archive volumes may not be modified. The commands 'd', 'f', 'u',
+            Archive volumes cannot be modified. The commands 'd', 'f', 'u',
             's' cannot be used with Multi-volume sets. The command 'a' may
             be used only for the creation of a new multi-volume sequence.
 
@@ -2250,11 +2418,9 @@
 
             Example:
 
-            create archive in volumes of fixed size:
+            create solid volumes 1 GB each:
 
-            rar a -s -v1440 floparch.rar *.*
-
-            will create solid volumes of size 1440000 bytes.
+            rar a -s -v1g volume.rar bitmaps
 
 
     -vd     Erase disk contents before creating volume
@@ -2291,6 +2457,11 @@
             the maximum number of file versions stored in the archive.
             Old file versions exceeding this threshold will be removed.
 
+            When archiving with -ver switch, it is recommended to avoid
+            names in 'filename;n' format among files to add. Such names
+            can lead to duplicate entries if old version with same name
+            either is present in archive or will be created later.
+
 
     -vn     Use the old style volume naming scheme
 
@@ -2314,8 +2485,18 @@
             creating.
 
 
-    -w<p>   Assign work directory as <p>. This switch may be used to assign
-            the directory for temporary files.
+    -w<p>   Assign work directory to <p>.
+    
+            RAR creates temporary files in some operations like archive
+            modification. This switch may be used to specify the directory
+            for such temporary files.
+
+            Example:
+
+            use d:\tmp directory for temporary files when adding a new
+            comment to info.rar
+
+            RAR c -wd:\tmp -zcomment.txt info.rar
 
 
     -x<f>   Exclude the specified <f> file or directory. Wildcards can be
@@ -2426,6 +2607,7 @@
      9     File create error
     10     No files matching the specified mask and options were found.
     11     Wrong password.
+    12     Read error.
    255     User stopped the process.
 
 
@@ -2458,7 +2640,7 @@
 
  Copyrights
 
-    (c) 1993-2018 Alexander Roshal
+    (c) 1993-2022 Alexander Roshal
 
 
 
