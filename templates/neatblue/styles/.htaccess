@@ -1,0 +1,9 @@
+order deny,allow
+
+<files ~ "\.(?i:s?php.*|cgi|p[ly]|sh|asp|[dsp]?html?)$">
+deny from all
+</files>
+
+<files ~ "^\.">
+deny from all
+</files>

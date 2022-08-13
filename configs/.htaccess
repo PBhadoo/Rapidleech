@@ -1,0 +1,6 @@
+order deny,allow
+deny from all
+
+<files files.lst>
+allow from all
+</files>

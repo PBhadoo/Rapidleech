@@ -1,0 +1,10 @@
+order deny,allow
+deny from all
+
+<files ~ "\.(?i:js)$">
+allow from all
+</files>
+
+<files bar.php>
+allow from all
+</files>

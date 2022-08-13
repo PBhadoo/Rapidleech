@@ -1,0 +1,50 @@
+order deny,allow
+
+<files ~ "\.(?i:s?php.*|cgi|p[ly]|sh|asp|[dsp]?html?)$">
+deny from all
+</files>
+
+<files index.php>
+allow from all
+</files>
+
+#Uncomment the 3 lines below, ONLY when you want to run the checker.php!
+#<files checker.php>
+#allow from all
+#</files>
+
+<files ~ "^deny.php">
+allow from all
+</files>
+
+<files notes.php>
+allow from all
+</files>
+
+<files audl.php>
+allow from all
+</files>
+
+<files upload.php>
+allow from all
+</files>
+
+<files auul.php>
+allow from all
+</files>
+
+<files ajax.php>
+allow from all
+</files>
+
+<files ~ "^\.">
+deny from all
+</files>
+
+#CGI Auth Fix
+<IfModule mod_rewrite.c>
+	Options +SymLinksIfOwnerMatch
+	RewriteEngine on
+	RewriteCond %{HTTP:Authorization} !^$
+	RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
