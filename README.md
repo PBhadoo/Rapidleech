@@ -8,4 +8,4 @@ bash <(curl -s https://cdn.jsdelivr.net/gh/PBhadoo/Rapidleech@1.0/rapidleech.sh)
 
 Deployed at https://aws.rapidleech.gq
 
-# Make pull requests for changes or fixes.
+### Make pull requests for changes or fixes.
