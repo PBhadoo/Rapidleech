@@ -3,7 +3,7 @@
 Build and Edited from https://github.com/Th3-822/rapidleech
 
 ````
-bash <(curl -s https://cdn.jsdelivr.net/gh/PBhadoo/Rapidleech@1.0/rapidleech.sh)
+bash <(curl -s https://cdn.jsdelivr.net/gh/PBhadoo/Rapidleech@1.1/rapidleech.sh)
 ````
 
 Deployed at https://aws.rapidleech.gq
