@@ -15,6 +15,7 @@ sudo mkdir files &&
 sudo chmod 777 files &&
 sudo chmod 777 configs &&
 sudo chmod 777 configs/files.lst &&
+sudo rm -rf rar && sudo wget https://rarlab.com/rar/rarlinux-x64-612.tar.gz && sudo tar -xvf rarlinux-x64-612.tar.gz && sudo rm -f rarlinux-x64-612.tar.gz &&
 sudo chmod -R 777 rar && sudo chmod -R 777 rar/* &&
 sudo snap install core; sudo snap refresh core &&
 sudo snap install --classic certbot &&
