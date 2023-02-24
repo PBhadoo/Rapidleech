@@ -19,7 +19,7 @@ $options = array (
   'notes_disable' => false,
   'upload_html_disable' => false,
   'myuploads_disable' => false,
-  'login' => true,
+  'login' => false,
   'users' => 
   array (
     'transload' => 'transload',
