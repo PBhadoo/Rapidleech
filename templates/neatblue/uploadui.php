@@ -20,14 +20,25 @@
 <br />
 <script type="text/javascript">
 /* <![CDATA[ */
-function pr(percent, received, speed)
-{
-	document.getElementById('received').innerHTML = '<b>' + received + '</b>';
-	document.getElementById('percent').innerHTML = '<b>' + percent + '%</b>';
-	document.getElementById('progress').style.width = percent + '%';
-	document.getElementById('speed').innerHTML = '<b>' + speed + ' KB/s</b>';
-	document.title = percent + '% Uploaded';
-	return true;
+function pr(percent, received, speed) {
+  const units = ['KB/s', 'MB/s', 'GB/s', 'TB/s', 'PB/s'];
+  let speedIndex = 0;
+  let convertedSpeed = speed;
+
+  while (convertedSpeed >= 1000 && speedIndex < units.length - 1) {
+    convertedSpeed /= 1000;
+    speedIndex++;
+  }
+
+  const speedString = `${convertedSpeed.toFixed(2)} ${units[speedIndex]}`;
+
+  document.getElementById('received').innerHTML = `<b>${received}</b>`;
+  document.getElementById('percent').innerHTML = `<b>${percent}%</b>`;
+  document.getElementById('progress').style.width = `${percent}%`;
+  document.getElementById('speed').innerHTML = `<b>${speedString}</b>`;
+  document.title = `${percent}% Downloaded`;
+
+  return true;
 }
 
 function mail(str, field)
