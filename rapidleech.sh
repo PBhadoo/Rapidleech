@@ -1,6 +1,10 @@
 #!/bin/sh
 sudo apt -y update && sudo apt -y upgrade &&
-sudo apt-get -y install apache2 &&
+sudo apt -y install apache2 &&
+sudo apt install -y language-pack-en-base &&
+export LC_ALL=en_US.UTF-8 &&
+export LANG=en_US.UTF-8 &&
+sudo apt install -y software-properties-common
 sudo add-apt-repository -y ppa:ondrej/php &&
 sudo apt -y update && sudo apt -y upgrade &&
 sudo apt -y install unzip &&
