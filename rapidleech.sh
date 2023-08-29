@@ -1,9 +1,13 @@
 #!/bin/sh
-sudo apt-get -y update && sudo apt-get -y upgrade && sudo apt -y update && sudo apt -y upgrade &&
-sudo apt-get -y install apache2 &&
-sudo apt-get -y update && sudo apt-get -y upgrade && sudo apt -y update && sudo apt -y upgrade &&
+sudo apt -y update && sudo apt -y upgrade &&
+sudo apt -y install apache2 &&
+sudo apt install -y language-pack-en-base &&
+export LC_ALL=en_US.UTF-8 &&
+export LANG=en_US.UTF-8 &&
+sudo apt install -y software-properties-common
 sudo add-apt-repository -y ppa:ondrej/php &&
-sudo apt-get -y update && sudo apt-get -y upgrade && sudo apt -y update && sudo apt -y upgrade && sudo apt -y install unzip &&
+sudo apt -y update && sudo apt -y upgrade &&
+sudo apt -y install unzip &&
 sudo apt install -y php7.4 &&
 sudo apt install -y php7.4-common php7.4-mysql php7.4-xml php7.4-xmlrpc php7.4-curl php7.4-gd php7.4-imagick php7.4-cli php7.4-dev php7.4-imap php7.4-mbstring php7.4-opcache php7.4-soap php7.4-zip php7.4-intl &&
 sudo service apache2 restart &&

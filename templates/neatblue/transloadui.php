@@ -31,7 +31,7 @@ function pr(percent, received, speed) {
     speedIndex++;
   }
 
-  const speedString = `${convertedSpeed.toFixed(2)} ${units[speedIndex]}`;
+  const speedString = `${Number(convertedSpeed).toFixed(2)} ${units[speedIndex]}`;
 
   document.getElementById('received').innerHTML = `<b>${received}</b>`;
   document.getElementById('percent').innerHTML = `<b>${percent}%</b>`;
