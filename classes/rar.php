@@ -6,7 +6,7 @@ class rlRar {
 	function __construct($filename, $forbidden_filetypes=array('.xxx')) {
 		$this->debug = false;
 		$this->filename = trim($filename);
-		$this->rar_forbidden = (!empty($forbidden_filetypes) ? '-x*' . implode($forbidden_filetypes, ' -x*') : '');
+		$this->rar_forbidden = (!empty($forbidden_filetypes) ? '-x*' . implode(' -x*', $forbidden_filetypes) : '');
 		if (is_file(ROOT_DIR . '/rar/rar')) {
 			$this->rar_exec = ROOT_DIR . '/rar/rar';
 			$return = 'rar';
