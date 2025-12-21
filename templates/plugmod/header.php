@@ -28,4 +28,4 @@ if ($GLOBALS['options']['flist_sort']) { echo '<script type="text/javascript" sr
 </head>
 
 <body>
-<center><a href="/"><img src="https://images.cdn.hashhackers.com/logo/logo-white-d.svg" alt="Hash Hackers" border="0" height="40px" style="margin-top: 10px;"></a></center><br />
+<center><a href="/"><img src="https://cdn.jsdelivr.net/gh/1337-to/asserscdn@1.0/hashhackers.svg" alt="Hash Hackers" border="0" height="40px" style="margin-top: 10px;"></a></center><br />

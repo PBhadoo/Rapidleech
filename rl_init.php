@@ -27,7 +27,7 @@ define('HOST_DIR', 'hosts/');
 define('CLASS_DIR', 'classes/');
 define('CONFIG_DIR', 'configs/');
 define('BUILD', '30May2011');
-define('CREDITS', '<a href="https://rzp.io/l/rapidleech" target="_blank"><img src="https://i1.wp.com/vtsbharath.org/wp-content/uploads/2016/04/Donate-Banner.jpg" alt="Donate"></a><br><a href="https://github.com/Th3-822/rapidleech" class="rl-link"><b>RapidLeech</b></a>&nbsp;<b class="rev-dev">PlugMod (eqbal) rev. ' . $rev_num . '</b> <span class="rev-dev">' . $dev_name . '</span><br><small class="small-credits">Bhadoo Cloud Cyber Systems and Tesseract Corporation</small><br><a href="https://hits.seeyoufarm.com"><img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Frapidleech.hashhackers.com&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false"/></a><br><small class="small-credits">For DMCA contact dmca@hashhackers.com, please allow 48 hours to process DMCA requests.</small>');
+define('CREDITS', '<a href="https://github.com/Th3-822/rapidleech" class="rl-link"><b>RapidLeech</b></a>&nbsp;<b class="rev-dev">PlugMod (eqbal) rev. ' . $rev_num . '</b> <span class="rev-dev">' . $dev_name . '</span><br><small class="small-credits">Bhadoo Cloud Cyber Systems and Tesseract Corporation</small><br><a href="https://hits.seeyoufarm.com"><img src="https://hits.sh/rapidleech.hashhackers.com.svg?view=today-total&style=for-the-badge&label=Visitors&color=0d1117&labelColor=00aaff"/></a><br><small class="small-credits">For DMCA contact dmca@hashhackers.com, please allow 48 hours to process DMCA requests.</small>');
 
 require_once(CONFIG_DIR . 'setup.php');
 
