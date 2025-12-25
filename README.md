@@ -8,7 +8,8 @@ Build and Edited from https://github.com/Th3-822/rapidleech
 bash <(curl -s https://cdn.jsdelivr.net/gh/PBhadoo/Rapidleech@1.6/rapidleech.sh)
 ````
 
-Deployed at https://gcp.apranet.eu.org Domain Changed
+Deployed at [https://gcp.apranet.eu.org](https://rapidleech-frankfurt.indexer.eu.org/)
+
 Visit https://telegam.dog/Transload
 
 ### Make pull requests for changes or fixes.
