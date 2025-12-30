@@ -591,11 +591,28 @@ input[type="submit"]:hover, input[type="button"]:hover, button:hover {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  table-layout: fixed;
 }
 
 .filelist th, .filelist td {
   padding: 14px 16px;
   text-align: left;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.filelist td:nth-child(2) {
+  max-width: 300px;
+  word-break: break-all;
+}
+
+.filelist a {
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-all;
+  color: var(--text-accent);
+  text-decoration: none;
 }
 
 .flisttblhdr {
@@ -623,11 +640,6 @@ input[type="submit"]:hover, input[type="button"]:hover, button:hover {
 .flisttblftr {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
-}
-
-.filelist a {
-  color: var(--text-accent);
-  text-decoration: none;
 }
 
 .filelist a:hover {
