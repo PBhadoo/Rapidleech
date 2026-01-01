@@ -1027,6 +1027,17 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
         $saveToFile = dirname($saveToFile) . PATH_SPLITTER . $FileName;
     }
     
+    // Create metadata file to track filename for pending downloads display
+    $chunkHash = md5($url);
+    $metaFile = dirname($saveToFile) . '/.chunk_' . $chunkHash . '.meta';
+    @file_put_contents($metaFile, json_encode(array(
+        'filename' => $FileName,
+        'filesize' => $fileSize,
+        'chunks' => $numChunks,
+        'url' => $url,
+        'started' => time()
+    )));
+    
     $fileSizeDisplay = bytesToKbOrMbOrGb($fileSize);
     echo(lang(104) . " <b>$FileName</b>, " . lang(56) . " <b>$fileSizeDisplay</b>...<br />");
     echo "<p><b>Using parallel download with $numChunks chunks</b></p>";
@@ -1146,11 +1157,14 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
     curl_multi_close($mh);
     
     if (!$allSuccess) {
-        // Cleanup chunk files
+        // Cleanup chunk files and metadata
         foreach ($chunks as $chunk) {
             if (file_exists($chunk['file'])) {
                 @unlink($chunk['file']);
             }
+        }
+        if (isset($metaFile) && file_exists($metaFile)) {
+            @unlink($metaFile);
         }
         $lastError = lang(106);
         return false;
@@ -1162,6 +1176,9 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
         $lastError = sprintf(lang(101), $FileName, dirname($saveToFile));
         foreach ($chunks as $chunk) {
             @unlink($chunk['file']);
+        }
+        if (isset($metaFile) && file_exists($metaFile)) {
+            @unlink($metaFile);
         }
         return false;
     }
@@ -1178,6 +1195,9 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
             foreach ($chunks as $chunk) {
                 @unlink($chunk['file']);
             }
+            if (isset($metaFile) && file_exists($metaFile)) {
+                @unlink($metaFile);
+            }
             $lastError = 'Failed to read chunk ' . $i;
             return false;
         }
@@ -1189,6 +1209,11 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
     
     flock($finalFp, LOCK_UN);
     fclose($finalFp);
+    
+    // Cleanup metadata file
+    if (isset($metaFile) && file_exists($metaFile)) {
+        @unlink($metaFile);
+    }
     
     $time = microtime(true) - $timeStart;
     $speed = $time > 0 ? round($bytesReceived / 1024 / $time, 2) : 0;

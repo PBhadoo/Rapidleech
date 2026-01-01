@@ -99,14 +99,31 @@ switch ($_GET['ajax']) {
 		// Add parallel chunk downloads as single entries
 		foreach ($chunkGroups as $hash => $group) {
 			$numChunks = count($group['chunks']);
+			
+			// Try to get actual filename from metadata file
+			$metaFile = $download_dir . '.chunk_' . $hash . '.meta';
+			$filename = 'Parallel Download (' . $numChunks . ' chunks)';
+			$totalSize = $group['total_size'];
+			
+			if (file_exists($metaFile)) {
+				$meta = @json_decode(@file_get_contents($metaFile), true);
+				if ($meta && isset($meta['filename'])) {
+					$filename = $meta['filename'];
+					if (isset($meta['filesize'])) {
+						$totalSize = $meta['filesize'];
+					}
+				}
+			}
+			
 			$pending[] = array(
-				'filename' => 'Parallel Download (' . $numChunks . ' chunks)',
-				'size' => bytesToKbOrMbOrGb($group['total_size']),
+				'filename' => $filename,
+				'size' => bytesToKbOrMbOrGb($group['total_size']) . ' / ' . bytesToKbOrMbOrGb($totalSize),
 				'modified' => date('H:i:s', $group['latest_mtime']),
 				'status' => 'Downloading ' . $numChunks . ' chunks...',
-				'progress' => 0,
+				'progress' => ($totalSize > 0) ? round(($group['total_size'] / $totalSize) * 100, 1) : 0,
 				'age' => $group['age'],
-				'parallel' => true
+				'parallel' => true,
+				'chunks' => $numChunks
 			);
 		}
 		
