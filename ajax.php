@@ -10,6 +10,235 @@ define ( 'TEMPLATE_DIR', 'templates/'.$options['template_used'].'/' );
 $nn = "\r\n";
 // For ajax calls, lets make it use less resource as possible
 switch ($_GET['ajax']) {
+	case 'pending_downloads':
+		// Get pending/in-progress downloads (files with .part extension or recently modified files)
+		if (!str_ends_with($options['download_dir'], '/')) {
+			$options['download_dir'] .= '/';
+		}
+		$download_dir = $options['download_dir'];
+		$pending = [];
+		
+		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
+			$now = time();
+			while (($file = readdir($dir)) !== false) {
+				if ($file === '.' || $file === '..') {
+					continue;
+				}
+				$filepath = $download_dir . $file;
+				if (!is_file($filepath)) {
+					continue;
+				}
+				
+				$ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+				$mtime = @filemtime($filepath);
+				$size = @filesize($filepath);
+				$age = $now - $mtime;
+				
+				// Consider as pending if:
+				// 1. Has .part extension (download in progress)
+				// 2. Has .tmp extension
+				// 3. File was modified in last 60 seconds (actively downloading)
+				$isPending = false;
+				$status = '';
+				
+				if ($ext === 'part' || $ext === 'tmp' || $ext === 'download') {
+					$isPending = true;
+					$status = 'Downloading...';
+				} elseif ($age < 60) {
+					$isPending = true;
+					$status = 'Active (' . $age . 's ago)';
+				} elseif ($age < 300 && $size === 0) {
+					$isPending = true;
+					$status = 'Starting...';
+				}
+				
+				if ($isPending) {
+					$pending[] = [
+						'filename' => $file,
+						'size' => bytesToKbOrMbOrGb($size),
+						'modified' => date('H:i:s', $mtime),
+						'status' => $status,
+						'progress' => 0, // Can't determine actual progress without additional tracking
+						'age' => $age
+					];
+				}
+			}
+			closedir($dir);
+		}
+		
+		// Sort by most recently modified first
+		usort($pending, fn($a, $b) => $a['age'] - $b['age']);
+		
+		header('Content-Type: application/json');
+		echo array_to_json(['downloads' => $pending]);
+		break;
+	
+	case 'queue_status':
+		// Get download queue status
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		$downloads = $queue->getAllDownloads();
+		$stats = $queue->getStats();
+		
+		// Format downloads for display
+		$formatted = [];
+		foreach ($downloads as $dl) {
+			$progress = 0;
+			if ($dl['total_size'] > 0) {
+				$progress = round(($dl['downloaded'] / $dl['total_size']) * 100, 1);
+			}
+			$formatted[] = [
+				'id' => $dl['id'],
+				'filename' => $dl['filename'] ?: basename(parse_url($dl['url'], PHP_URL_PATH)),
+				'url' => $dl['url'],
+				'status' => $dl['status'],
+				'size' => $dl['total_size'] > 0 ? bytesToKbOrMbOrGb($dl['total_size']) : 'Unknown',
+				'downloaded' => bytesToKbOrMbOrGb($dl['downloaded']),
+				'progress' => $progress,
+				'speed' => $dl['speed'] > 0 ? bytesToKbOrMbOrGb($dl['speed']) . '/s' : '-',
+				'resumable' => $dl['resumable'],
+				'chunks' => count($dl['chunks']),
+				'error' => $dl['error'],
+				'added' => date('H:i:s', $dl['added_at'])
+			];
+		}
+		
+		header('Content-Type: application/json');
+		echo array_to_json(['downloads' => $formatted, 'stats' => $stats]);
+		break;
+	
+	case 'queue_add':
+		// Add URL to queue
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$url = isset($_POST['url']) ? trim($_POST['url']) : '';
+		$filename = isset($_POST['filename']) ? trim($_POST['filename']) : '';
+		$opts = [
+			'referer' => $_POST['referer'] ?? '',
+			'cookie' => $_POST['cookie'] ?? ''
+		];
+		
+		if (empty($url)) {
+			header('Content-Type: application/json');
+			echo array_to_json(['success' => false, 'error' => 'URL is required']);
+			break;
+		}
+		
+		$id = $queue->addToQueue($url, $filename, $opts);
+		
+		header('Content-Type: application/json');
+		echo array_to_json(['success' => true, 'id' => $id]);
+		break;
+	
+	case 'queue_remove':
+		// Remove from queue
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$id = $_POST['id'] ?? '';
+		$result = $queue->removeFromQueue($id);
+		
+		header('Content-Type: application/json');
+		echo array_to_json(['success' => $result]);
+		break;
+	
+	case 'queue_pause':
+		// Pause download
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$id = $_POST['id'] ?? '';
+		$result = $queue->pauseDownload($id);
+		
+		header('Content-Type: application/json');
+		echo array_to_json(['success' => $result]);
+		break;
+	
+	case 'queue_resume':
+		// Resume download
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$id = $_POST['id'] ?? '';
+		$result = $queue->resumeDownload($id);
+		
+		header('Content-Type: application/json');
+		echo array_to_json(['success' => $result]);
+		break;
+	
+	case 'queue_clear_completed':
+		// Clear completed downloads
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		$queue->clearCompleted();
+		
+		header('Content-Type: application/json');
+		echo array_to_json(['success' => true]);
+		break;
+	
+	case 'queue_process':
+		// Process queue - start next download if slots available
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$stats = $queue->getStats();
+		$started = 0;
+		
+		// Start downloads up to max concurrent
+		while ($stats['downloading'] + $started < $stats['max_concurrent']) {
+			$next = $queue->getNextQueued();
+			if (!$next) {
+				break;
+			}
+			
+			// Check resume support and file size
+			$info = $queue->checkResumeSupport($next['url'], $next['options']);
+			
+			$updates = [
+				'status' => 'downloading',
+				'started_at' => time(),
+				'total_size' => $info['size'],
+				'resumable' => $info['resumable'],
+				'filename' => $next['filename'] ?: $info['filename']
+			];
+			
+			// Create chunks if resumable
+			if ($info['resumable'] && $info['size'] > 0) {
+				$updates['chunks'] = $queue->createChunks($info['size']);
+			} else {
+				// Single chunk for non-resumable
+				$updates['chunks'] = [[
+					'id' => 0,
+					'start' => 0,
+					'end' => $info['size'] > 0 ? $info['size'] - 1 : 0,
+					'downloaded' => 0,
+					'status' => 'pending'
+				]];
+			}
+			
+			$queue->updateDownload($next['id'], $updates);
+			$started++;
+			
+			// Trigger background download (non-blocking)
+			$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+			$processUrl = $protocol . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/queue_worker.php?id=' . $next['id'];
+			
+			// Use curl to trigger async
+			$ch = curl_init($processUrl);
+			curl_setopt_array($ch, [
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_TIMEOUT => 1,
+				CURLOPT_NOSIGNAL => 1,
+			]);
+			curl_exec($ch);
+			curl_close($ch);
+		}
+		
+		header('Content-Type: application/json');
+		echo array_to_json(['success' => true, 'started' => $started]);
+		break;
+	
 	case 'server_stats':
 		if ($options['server_info'] && $options['ajax_refresh']) {
 			ob_start();

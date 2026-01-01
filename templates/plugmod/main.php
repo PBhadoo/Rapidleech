@@ -124,9 +124,9 @@ if (!defined('RAPIDLEECH')) {
             </button>
             <button id="navcell4" class="cell-nav" onclick="javascript:switchCell(4);">
                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -3px; margin-right: 6px;">
-                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                    <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9V9h4V5h2v4h4v2z"/>
                 </svg>
-                <?php echo lang(332); ?>
+                Download Queue
             </button>
         </nav>
 
@@ -460,81 +460,407 @@ if (!defined('RAPIDLEECH')) {
             /* ]]> */
             </script>
 
-            <!-- Tab 4: Link Checker -->
+            <!-- Tab 4: Download Queue -->
             <div class="hide-table tab-content" id="tb4">
-                <div style="text-align: center;">
-                    <h3 style="margin-bottom: 16px; color: var(--text-primary);">
-                        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -5px; margin-right: 8px;">
-                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
-                        </svg>
-                        <?php echo lang(267); ?>
-                    </h3>
-                    
-                    <?php
-                    $name = array_keys($sites);
-                    sort($name);
-                    $workswith = implode(' | ', $name);
-                    ?>
-                    <div class="workswith">
-                        <?php echo $workswith; ?>
-                        <br><strong><?php echo lang(268); ?></strong><br>
-                        Anonym.to | Linkbucks.com | Lix.in<br>
-                        Rapidshare.com Folders | Usercash.com
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: var(--text-primary);">
+                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -5px; margin-right: 8px;">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                            Download Queue
+                        </h3>
+                        <div id="queue-stats" style="font-size: 13px; color: var(--text-muted);">
+                            Loading...
+                        </div>
                     </div>
                     
-                    <form action="ajax.php?ajax=linkcheck" method="post" id="linkchecker" onsubmit="return startLinkCheck();">
-                        <div style="margin: 20px 0;">
-                            <textarea rows="10" name="links" id="links" placeholder="Paste your links here, one per line..." style="width: 100%; max-width: 600px;"></textarea>
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <a href="<?php echo $PHP_SELF.'?debug=1' ?>" style="color: var(--text-accent); font-weight: 500;">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -3px; margin-right: 4px;">
-                                    <path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/>
+                    <!-- Add URL Form -->
+                    <div class="rl-card" style="margin-bottom: 20px; background: var(--bg-tertiary);">
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+                            <div style="flex: 1; min-width: 250px;">
+                                <label class="rl-label">Add URL to Queue</label>
+                                <input type="text" id="queue-url" placeholder="https://example.com/file.zip" style="width: 100%; max-width: 100%;">
+                            </div>
+                            <button onclick="addToQueue();" class="rl-btn rl-btn-primary">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                                 </svg>
-                                <?php echo lang(269); ?>
-                            </a>
+                                Add to Queue
+                            </button>
+                            <button onclick="processQueue();" class="rl-btn rl-btn-secondary">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z"/>
+                                </svg>
+                                Start Queue
+                            </button>
                         </div>
-                        
-                        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
-                            <label class="rl-checkbox">
-                                <input type="checkbox" value="1" name="d" id="chk_d">
-                                <?php echo lang(270); ?>
-                            </label>
-                            <label class="rl-checkbox">
-                                <input type="checkbox" value="1" name="k" id="chk_k">
-                                <?php echo lang(271); ?>
-                            </label>
-                        </div>
-                        
-                        <button type="submit" id="submit" class="rl-btn rl-btn-primary">
-                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </div>
+                    
+                    <!-- Queue Controls -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+                        <button onclick="refreshQueue();" class="rl-btn rl-btn-secondary rl-btn-sm">
+                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
                             </svg>
-                            <?php echo lang(272); ?>
+                            Refresh
                         </button>
-                    </form>
+                        <button onclick="clearCompleted();" class="rl-btn rl-btn-secondary rl-btn-sm">
+                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                            </svg>
+                            Clear Completed
+                        </button>
+                        <span style="margin-left: auto; font-size: 12px; color: var(--text-muted); display: flex; align-items: center;">
+                            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24" style="margin-right: 4px; animation: spin 2s linear infinite;">
+                                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                            </svg>
+                            Auto-refresh: 5s
+                        </span>
+                    </div>
                     
-                    <p style="margin-top: 20px; font-size: 11px; color: var(--text-muted);">
-                        Lix Checker v3.0.0 | Copyright Dman - MaxW.org | Optimized by zpikdum and sarkar<br>
-                        <strong>Mod by eqbal | Ajax'd by TheOnly92 | Updated by Th3-822</strong>
-                    </p>
-                    
-                    <span id="loading" style="display: none; margin-top: 20px;">
-                        <?php echo lang(273); ?>
-                        <img alt="<?php echo lang(274); ?>" src="templates/plugmod/images/ajax-loading.gif" style="vertical-align: middle;">
-                    </span>
-                    
-                    <div id="linkchecker-results"></div>
+                    <!-- Queue List -->
+                    <div id="queue-container" style="text-align: left;">
+                        <div class="queue-empty">Loading queue...</div>
+                    </div>
                 </div>
+                
+                <style>
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                .queue-item {
+                    background: var(--bg-secondary);
+                    border-radius: var(--radius-md);
+                    padding: 16px;
+                    margin-bottom: 12px;
+                    border: 1px solid var(--border-color);
+                    transition: all 0.2s ease;
+                }
+                .queue-item:hover {
+                    border-color: var(--accent-primary);
+                    box-shadow: var(--shadow-md);
+                }
+                .queue-item.downloading {
+                    border-left: 4px solid var(--accent-primary);
+                }
+                .queue-item.completed {
+                    border-left: 4px solid var(--success);
+                    opacity: 0.8;
+                }
+                .queue-item.error {
+                    border-left: 4px solid var(--error);
+                }
+                .queue-item.paused {
+                    border-left: 4px solid var(--warning);
+                }
+                .queue-item.queued {
+                    border-left: 4px solid var(--text-muted);
+                }
+                .queue-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 12px;
+                    margin-bottom: 8px;
+                }
+                .queue-filename {
+                    font-weight: 600;
+                    color: var(--text-primary);
+                    word-break: break-all;
+                    flex: 1;
+                }
+                .queue-status {
+                    font-size: 12px;
+                    font-weight: 600;
+                    padding: 4px 10px;
+                    border-radius: 12px;
+                    text-transform: uppercase;
+                    white-space: nowrap;
+                }
+                .queue-status.downloading { background: var(--accent-primary); color: white; }
+                .queue-status.queued { background: var(--bg-tertiary); color: var(--text-muted); }
+                .queue-status.completed { background: var(--success); color: white; }
+                .queue-status.error { background: var(--error); color: white; }
+                .queue-status.paused { background: var(--warning); color: white; }
+                .queue-status.checking { background: var(--accent-secondary); color: white; }
+                .queue-meta {
+                    display: flex;
+                    gap: 16px;
+                    flex-wrap: wrap;
+                    font-size: 13px;
+                    color: var(--text-muted);
+                    margin-bottom: 8px;
+                }
+                .queue-meta span {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                }
+                .queue-progress {
+                    height: 8px;
+                    background: var(--bg-progress);
+                    border-radius: 4px;
+                    overflow: hidden;
+                    margin: 10px 0;
+                }
+                .queue-progress-bar {
+                    height: 100%;
+                    background: var(--accent-gradient);
+                    border-radius: 4px;
+                    transition: width 0.5s ease;
+                }
+                .queue-chunks {
+                    display: flex;
+                    gap: 2px;
+                    margin: 8px 0;
+                    height: 4px;
+                }
+                .queue-chunk {
+                    flex: 1;
+                    background: var(--bg-progress);
+                    border-radius: 2px;
+                    transition: background 0.3s ease;
+                }
+                .queue-chunk.active { background: var(--accent-primary); }
+                .queue-chunk.done { background: var(--success); }
+                .queue-chunk.error { background: var(--error); }
+                .queue-actions {
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 10px;
+                    flex-wrap: wrap;
+                }
+                .queue-actions button {
+                    padding: 6px 12px;
+                    font-size: 12px;
+                }
+                .queue-error {
+                    color: var(--error);
+                    font-size: 12px;
+                    margin-top: 8px;
+                    padding: 8px;
+                    background: rgba(239, 68, 68, 0.1);
+                    border-radius: var(--radius-sm);
+                }
+                .queue-empty {
+                    text-align: center;
+                    padding: 60px 20px;
+                    color: var(--text-muted);
+                }
+                .queue-info {
+                    font-size: 11px;
+                    color: var(--text-muted);
+                    margin-top: 4px;
+                }
+                </style>
+                
+                <script type="text/javascript">
+                var queueRefreshInterval = null;
+                
+                function refreshQueue() {
+                    $.ajax({
+                        url: 'ajax.php?ajax=queue_status',
+                        type: 'GET',
+                        dataType: 'json',
+                        success: function(data) {
+                            renderQueue(data);
+                        },
+                        error: function() {
+                            $('#queue-container').html('<div class="queue-empty">Error loading queue</div>');
+                        }
+                    });
+                }
+                
+                function renderQueue(data) {
+                    // Update stats
+                    var stats = data.stats || {};
+                    var statsHtml = '<span style="margin-right: 12px;"><strong>' + (stats.downloading || 0) + '</strong>/' + (stats.max_concurrent || 5) + ' active</span>';
+                    statsHtml += '<span style="margin-right: 12px;"><strong>' + (stats.queued || 0) + '</strong> queued</span>';
+                    statsHtml += '<span><strong>' + (stats.completed || 0) + '</strong> completed</span>';
+                    $('#queue-stats').html(statsHtml);
+                    
+                    // Render downloads
+                    var html = '';
+                    var downloads = data.downloads || [];
+                    
+                    if (downloads.length === 0) {
+                        html = '<div class="queue-empty">';
+                        html += '<svg width="64" height="64" fill="currentColor" viewBox="0 0 24 24" style="opacity: 0.3; margin-bottom: 16px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
+                        html += '<br><strong>Queue is empty</strong>';
+                        html += '<br><small>Add URLs above to start downloading</small>';
+                        html += '<div style="margin-top: 20px; font-size: 12px; color: var(--text-accent);">';
+                        html += '✓ Parallel downloads (8 chunks per file)<br>';
+                        html += '✓ Max 5 concurrent downloads<br>';
+                        html += '✓ Auto-resume support';
+                        html += '</div></div>';
+                    } else {
+                        for (var i = 0; i < downloads.length; i++) {
+                            var dl = downloads[i];
+                            html += '<div class="queue-item ' + dl.status + '">';
+                            
+                            // Header
+                            html += '<div class="queue-header">';
+                            html += '<div class="queue-filename">' + escapeHtml(dl.filename || 'Unknown file') + '</div>';
+                            html += '<span class="queue-status ' + dl.status + '">' + dl.status + '</span>';
+                            html += '</div>';
+                            
+                            // Meta info
+                            html += '<div class="queue-meta">';
+                            html += '<span><strong>Size:</strong> ' + dl.size + '</span>';
+                            html += '<span><strong>Downloaded:</strong> ' + dl.downloaded + '</span>';
+                            if (dl.speed && dl.speed != '-') {
+                                html += '<span><strong>Speed:</strong> ' + dl.speed + '</span>';
+                            }
+                            if (dl.resumable !== null) {
+                                html += '<span>' + (dl.resumable ? '✓ Resumable' : '✗ No resume') + '</span>';
+                            }
+                            if (dl.chunks > 1) {
+                                html += '<span><strong>Chunks:</strong> ' + dl.chunks + '</span>';
+                            }
+                            html += '</div>';
+                            
+                            // Progress bar
+                            if (dl.status === 'downloading' || dl.progress > 0) {
+                                html += '<div class="queue-progress"><div class="queue-progress-bar" style="width: ' + dl.progress + '%"></div></div>';
+                                html += '<div class="queue-info">' + dl.progress + '% complete</div>';
+                            }
+                            
+                            // Error message
+                            if (dl.error) {
+                                html += '<div class="queue-error">Error: ' + escapeHtml(dl.error) + '</div>';
+                            }
+                            
+                            // Actions
+                            html += '<div class="queue-actions">';
+                            if (dl.status === 'downloading') {
+                                html += '<button onclick="pauseDownload(\'' + dl.id + '\');" class="rl-btn rl-btn-secondary rl-btn-sm">Pause</button>';
+                            } else if (dl.status === 'paused' || dl.status === 'error') {
+                                html += '<button onclick="resumeDownload(\'' + dl.id + '\');" class="rl-btn rl-btn-primary rl-btn-sm">Resume</button>';
+                            }
+                            if (dl.status !== 'downloading') {
+                                html += '<button onclick="removeDownload(\'' + dl.id + '\');" class="rl-btn rl-btn-secondary rl-btn-sm" style="color: var(--error);">Remove</button>';
+                            }
+                            html += '</div>';
+                            
+                            html += '</div>';
+                        }
+                    }
+                    
+                    $('#queue-container').html(html);
+                }
+                
+                function addToQueue() {
+                    var url = $('#queue-url').val().trim();
+                    if (!url) {
+                        alert('Please enter a URL');
+                        return;
+                    }
+                    
+                    $.ajax({
+                        url: 'ajax.php?ajax=queue_add',
+                        type: 'POST',
+                        data: { url: url },
+                        dataType: 'json',
+                        success: function(data) {
+                            if (data.success) {
+                                $('#queue-url').val('');
+                                refreshQueue();
+                            } else {
+                                alert('Error: ' + (data.error || 'Failed to add URL'));
+                            }
+                        },
+                        error: function() {
+                            alert('Error adding URL to queue');
+                        }
+                    });
+                }
+                
+                function processQueue() {
+                    $.ajax({
+                        url: 'ajax.php?ajax=queue_process',
+                        type: 'GET',
+                        dataType: 'json',
+                        success: function(data) {
+                            refreshQueue();
+                            if (data.started > 0) {
+                                // Queue started
+                            }
+                        }
+                    });
+                }
+                
+                function pauseDownload(id) {
+                    $.post('ajax.php?ajax=queue_pause', { id: id }, function() {
+                        refreshQueue();
+                    }, 'json');
+                }
+                
+                function resumeDownload(id) {
+                    $.post('ajax.php?ajax=queue_resume', { id: id }, function() {
+                        refreshQueue();
+                        processQueue();
+                    }, 'json');
+                }
+                
+                function removeDownload(id) {
+                    if (confirm('Remove this download from queue?')) {
+                        $.post('ajax.php?ajax=queue_remove', { id: id }, function() {
+                            refreshQueue();
+                        }, 'json');
+                    }
+                }
+                
+                function clearCompleted() {
+                    $.get('ajax.php?ajax=queue_clear_completed', function() {
+                        refreshQueue();
+                    }, 'json');
+                }
+                
+                function escapeHtml(text) {
+                    if (!text) return '';
+                    var div = document.createElement('div');
+                    div.appendChild(document.createTextNode(text));
+                    return div.innerHTML;
+                }
+                
+                function startQueueRefresh() {
+                    if (queueRefreshInterval) clearInterval(queueRefreshInterval);
+                    refreshQueue();
+                    queueRefreshInterval = setInterval(refreshQueue, 5000);
+                }
+                
+                function stopQueueRefresh() {
+                    if (queueRefreshInterval) {
+                        clearInterval(queueRefreshInterval);
+                        queueRefreshInterval = null;
+                    }
+                }
+                
+                // Handle Enter key in URL input
+                $('#queue-url').keypress(function(e) {
+                    if (e.which == 13) {
+                        addToQueue();
+                        return false;
+                    }
+                });
+                
+                // Start refresh when tab 4 is shown
+                $(document).ready(function() {
+                    $('#navcell4').click(function() {
+                        startQueueRefresh();
+                    });
+                });
+                </script>
             </div>
         </div>
 
         <?php
         if(isset($_GET["act"])) {
             echo '<script type="text/javascript">switchCell(3);</script>';
-        } elseif(isset($_GET["debug"]) || isset($_POST["links"])) {
-            echo '<script type="text/javascript">switchCell(4);</script>';
+        } elseif(isset($_GET["pending"])) {
+            echo '<script type="text/javascript">switchCell(4); startPendingRefresh();</script>';
         } else {
             echo '<script type="text/javascript">$("#navcell1").addClass("selected");</script>';
         }
