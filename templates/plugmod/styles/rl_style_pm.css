@@ -71,6 +71,7 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 body {
@@ -81,6 +82,8 @@ body {
   background: var(--bg-primary);
   min-height: 100vh;
   transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* Background Pattern */
@@ -115,6 +118,8 @@ a:hover {
   max-width: 1200px;
   margin: 0 auto;
   padding: 24px;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* Header */
@@ -211,6 +216,122 @@ a:hover {
 @media (max-width: 968px) {
   .rl-main {
     grid-template-columns: 1fr;
+  }
+  
+  .rl-sidebar {
+    order: 2;
+  }
+  
+  .rl-content {
+    order: 1;
+  }
+}
+
+/* Mobile Responsive Fixes */
+@media (max-width: 600px) {
+  html {
+    font-size: 14px;
+  }
+  
+  body {
+    overflow-x: hidden;
+  }
+  
+  .rl-container {
+    padding: 12px;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  
+  .rl-header {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--radius-md);
+  }
+  
+  .rl-logo-text {
+    font-size: 18px;
+  }
+  
+  .rl-card {
+    padding: 16px;
+    border-radius: var(--radius-md);
+  }
+  
+  .rl-tabs {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  
+  .rl-tab, .cell-nav {
+    flex: 1 1 48%;
+    font-size: 11px;
+    padding: 8px 6px;
+    min-width: 0;
+  }
+  
+  .rl-tab svg, .cell-nav svg {
+    display: none;
+  }
+  
+  .tab-content, .rl-tab-content {
+    padding: 12px;
+  }
+  
+  /* Form fixes */
+  input[type="text"], input[type="password"], textarea, select {
+    max-width: 100% !important;
+    width: 100% !important;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+  
+  .rl-btn, button, input[type="submit"], input[type="button"] {
+    padding: 10px 16px;
+    font-size: 13px;
+    width: 100%;
+  }
+  
+  .rl-btn-block {
+    width: 100%;
+  }
+  
+  /* File list mobile fixes */
+  .filelist {
+    font-size: 12px;
+    display: block;
+    overflow-x: auto;
+  }
+  
+  .filelist th, .filelist td {
+    padding: 8px 6px;
+  }
+  
+  .filelist td:nth-child(2) {
+    max-width: 150px;
+  }
+  
+  /* Hide less important columns on mobile */
+  .filelist td:nth-child(4),
+  .filelist th:nth-child(4) {
+    display: none;
+  }
+  
+  /* Checkbox menu */
+  .chkmenu {
+    padding: 4px 8px;
+    font-size: 11px;
+    margin: 2px;
+  }
+  
+  /* Progress bar */
+  .rl-progress-container, .progressouter {
+    max-width: 100%;
+  }
+  
+  /* Grid layouts */
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
   }
 }
 
@@ -995,6 +1116,92 @@ th {
   
   input[type="text"], input[type="password"], textarea {
     max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* File list table responsive */
+  .filelist {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .filelist thead {
+    display: none;
+  }
+  
+  .filelist tbody {
+    display: block;
+  }
+  
+  .filelist tr {
+    display: block;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+  }
+  
+  .filelist td {
+    display: block;
+    text-align: left !important;
+    padding: 6px 8px;
+    border: none;
+  }
+  
+  .filelist td:first-child {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+  }
+  
+  .filelist td:nth-child(2) {
+    font-weight: 600;
+    max-width: 100%;
+    padding-right: 40px;
+  }
+  
+  .filelist td:nth-child(3)::before {
+    content: "Size: ";
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  
+  .filelist td:nth-child(4) {
+    display: block;
+  }
+  
+  .filelist td:nth-child(4)::before {
+    content: "Comment: ";
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  
+  .filelist td:nth-child(5)::before {
+    content: "Date: ";
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  
+  .filelist .flisttblhdr {
+    display: none;
+  }
+  
+  .filelist .flisttblftr {
+    display: block;
+    padding: 12px;
+  }
+  
+  .filelist .flisttblftr td {
+    display: inline-block;
+  }
+  
+  /* Fix overflow on tables container */
+  div[style*="overflow-x: auto"] {
+    max-width: 100%;
+    overflow-x: auto;
   }
 }
 
