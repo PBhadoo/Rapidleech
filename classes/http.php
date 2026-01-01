@@ -135,7 +135,6 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 				return $result;
 			}
 			// If parallel download failed, fall through to single-stream download
-			echo '<p><b>Parallel download failed, falling back to single stream...</b></p>';
 		}
 	}
 
