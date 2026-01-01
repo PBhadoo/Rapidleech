@@ -4,21 +4,26 @@
  * Supports parallel chunk downloading (like IDM) and queue management
  * Max 5 concurrent downloads, 8 chunks per resumable file
  * 
- * @requires PHP 8.0+
+ * Compatible with PHP 7.x+
  */
-
-declare(strict_types=1);
 
 if (!defined('RAPIDLEECH')) {
     require('../deny.php');
     exit();
 }
 
+// Polyfill for PHP < 8.0
+if (!function_exists('str_ends_with')) {
+    function str_ends_with($haystack, $needle) {
+        return $needle === '' || substr($haystack, -strlen($needle)) === $needle;
+    }
+}
+
 class DownloadQueue {
-    private string $queueFile;
-    private int $maxConcurrent = 5;
-    private int $chunksPerDownload = 8;
-    private int $chunkMinSize = 1048576; // 1MB minimum per chunk
+    private $queueFile;
+    private $maxConcurrent = 5;
+    private $chunksPerDownload = 8;
+    private $chunkMinSize = 1048576; // 1MB minimum per chunk
     
     public function __construct() {
         $this->queueFile = CONFIG_DIR . 'download_queue.json';
@@ -28,22 +33,22 @@ class DownloadQueue {
     /**
      * Initialize queue file if it doesn't exist
      */
-    private function initQueue(): void {
+    private function initQueue() {
         if (!file_exists($this->queueFile)) {
-            $this->saveQueue([
-                'settings' => [
+            $this->saveQueue(array(
+                'settings' => array(
                     'max_concurrent' => $this->maxConcurrent,
                     'chunks_per_download' => $this->chunksPerDownload
-                ],
-                'downloads' => []
-            ]);
+                ),
+                'downloads' => array()
+            ));
         }
     }
     
     /**
      * Load queue from file
      */
-    public function loadQueue(): array {
+    public function loadQueue() {
         if (file_exists($this->queueFile)) {
             $content = file_get_contents($this->queueFile);
             $queue = json_decode($content, true);
@@ -51,13 +56,13 @@ class DownloadQueue {
                 return $queue;
             }
         }
-        return ['settings' => [], 'downloads' => []];
+        return array('settings' => array(), 'downloads' => array());
     }
     
     /**
      * Save queue to file with file locking
      */
-    public function saveQueue(array $queue): void {
+    public function saveQueue($queue) {
         $lockFile = $this->queueFile . '.lock';
         $lock = fopen($lockFile, 'w');
         
@@ -73,11 +78,11 @@ class DownloadQueue {
     /**
      * Add a new download to the queue
      */
-    public function addToQueue(string $url, string $filename = '', array $options = []): string {
+    public function addToQueue($url, $filename = '', $options = array()) {
         $queue = $this->loadQueue();
         
         $id = uniqid('dl_', true);
-        $download = [
+        $download = array(
             'id' => $id,
             'url' => $url,
             'filename' => $filename,
@@ -88,11 +93,11 @@ class DownloadQueue {
             'total_size' => 0,
             'downloaded' => 0,
             'resumable' => null, // null = unknown, true/false after check
-            'chunks' => [],
+            'chunks' => array(),
             'speed' => 0,
             'error' => null,
             'options' => $options
-        ];
+        );
         
         $queue['downloads'][$id] = $download;
         $this->saveQueue($queue);
@@ -103,7 +108,7 @@ class DownloadQueue {
     /**
      * Remove a download from queue
      */
-    public function removeFromQueue(string $id): bool {
+    public function removeFromQueue($id) {
         $queue = $this->loadQueue();
         if (isset($queue['downloads'][$id])) {
             // Clean up chunk files if any
@@ -118,7 +123,7 @@ class DownloadQueue {
     /**
      * Update download status
      */
-    public function updateDownload(string $id, array $updates): bool {
+    public function updateDownload($id, $updates) {
         $queue = $this->loadQueue();
         if (isset($queue['downloads'][$id])) {
             $queue['downloads'][$id] = array_merge($queue['downloads'][$id], $updates);
@@ -131,23 +136,23 @@ class DownloadQueue {
     /**
      * Get download by ID
      */
-    public function getDownload(string $id): ?array {
+    public function getDownload($id) {
         $queue = $this->loadQueue();
-        return $queue['downloads'][$id] ?? null;
+        return isset($queue['downloads'][$id]) ? $queue['downloads'][$id] : null;
     }
     
     /**
      * Get all downloads
      */
-    public function getAllDownloads(): array {
+    public function getAllDownloads() {
         $queue = $this->loadQueue();
-        return $queue['downloads'] ?? [];
+        return isset($queue['downloads']) ? $queue['downloads'] : array();
     }
     
     /**
      * Get active download count
      */
-    public function getActiveCount(): int {
+    public function getActiveCount() {
         $queue = $this->loadQueue();
         $count = 0;
         foreach ($queue['downloads'] as $dl) {
@@ -161,7 +166,7 @@ class DownloadQueue {
     /**
      * Get next queued download
      */
-    public function getNextQueued(): ?array {
+    public function getNextQueued() {
         $queue = $this->loadQueue();
         foreach ($queue['downloads'] as $dl) {
             if ($dl['status'] === 'queued') {
@@ -174,20 +179,18 @@ class DownloadQueue {
     /**
      * Check if a URL supports resume (range requests)
      */
-    public function checkResumeSupport(string $url, array $options = []): array {
+    public function checkResumeSupport($url, $options = array()) {
         $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_NOBODY => true,
-            CURLOPT_HEADER => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            CURLOPT_RANGE => '0-0'
-        ]);
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        curl_setopt($ch, CURLOPT_RANGE, '0-0');
         
         if (!empty($options['cookie'])) {
             curl_setopt($ch, CURLOPT_COOKIE, $options['cookie']);
@@ -205,15 +208,13 @@ class DownloadQueue {
         
         // Get actual file size with a separate HEAD request
         $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_NOBODY => true,
-            CURLOPT_HEADER => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        ]);
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
         
         if (!empty($options['cookie'])) {
             curl_setopt($ch, CURLOPT_COOKIE, $options['cookie']);
@@ -233,32 +234,34 @@ class DownloadQueue {
         
         curl_close($ch);
         
-        return [
+        return array(
             'resumable' => $resumable,
             'size' => $fileSize,
             'filename' => $filename
-        ];
+        );
     }
     
     /**
      * Create chunk ranges for parallel download
      */
-    public function createChunks(int $fileSize, ?int $numChunks = null): array {
-        $numChunks ??= $this->chunksPerDownload;
+    public function createChunks($fileSize, $numChunks = null) {
+        if ($numChunks === null) {
+            $numChunks = $this->chunksPerDownload;
+        }
         
         // Don't create multiple chunks for small files
         if ($fileSize < $this->chunkMinSize * 2) {
-            return [[
+            return array(array(
                 'id' => 0,
                 'start' => 0,
                 'end' => $fileSize - 1,
                 'downloaded' => 0,
                 'status' => 'pending'
-            ]];
+            ));
         }
         
         $chunkSize = (int)ceil($fileSize / $numChunks);
-        $chunks = [];
+        $chunks = array();
         
         for ($i = 0; $i < $numChunks; $i++) {
             $start = $i * $chunkSize;
@@ -268,13 +271,13 @@ class DownloadQueue {
                 break;
             }
             
-            $chunks[] = [
+            $chunks[] = array(
                 'id' => $i,
                 'start' => $start,
                 'end' => $end,
                 'downloaded' => 0,
                 'status' => 'pending' // pending, downloading, completed, error
-            ];
+            );
         }
         
         return $chunks;
@@ -283,14 +286,14 @@ class DownloadQueue {
     /**
      * Get chunk file path
      */
-    public function getChunkPath(string $downloadId, int $chunkId): string {
+    public function getChunkPath($downloadId, $chunkId) {
         return DOWNLOAD_DIR . '.rl_chunk_' . $downloadId . '_' . $chunkId . '.tmp';
     }
     
     /**
      * Clean up chunk files
      */
-    public function cleanupChunks(array $download): void {
+    public function cleanupChunks($download) {
         if (!empty($download['chunks'])) {
             foreach ($download['chunks'] as $chunk) {
                 $chunkFile = $this->getChunkPath($download['id'], $chunk['id']);
@@ -304,7 +307,7 @@ class DownloadQueue {
     /**
      * Merge chunks into final file
      */
-    public function mergeChunks(array $download): bool {
+    public function mergeChunks($download) {
         $filename = DOWNLOAD_DIR . $download['filename'];
         $finalFile = fopen($filename, 'wb');
         
@@ -314,7 +317,7 @@ class DownloadQueue {
         
         // Sort chunks by ID to ensure correct order
         $chunks = $download['chunks'];
-        usort($chunks, fn(array $a, array $b): int => $a['id'] <=> $b['id']);
+        usort($chunks, function($a, $b) { return $a['id'] - $b['id']; });
         
         foreach ($chunks as $chunk) {
             $chunkFile = $this->getChunkPath($download['id'], $chunk['id']);
@@ -338,17 +341,17 @@ class DownloadQueue {
     /**
      * Pause a download
      */
-    public function pauseDownload(string $id): bool {
-        return $this->updateDownload($id, ['status' => 'paused']);
+    public function pauseDownload($id) {
+        return $this->updateDownload($id, array('status' => 'paused'));
     }
     
     /**
      * Resume a download
      */
-    public function resumeDownload(string $id): bool {
+    public function resumeDownload($id) {
         $download = $this->getDownload($id);
         if ($download && ($download['status'] === 'paused' || $download['status'] === 'error')) {
-            return $this->updateDownload($id, ['status' => 'queued', 'error' => null]);
+            return $this->updateDownload($id, array('status' => 'queued', 'error' => null));
         }
         return false;
     }
@@ -356,7 +359,7 @@ class DownloadQueue {
     /**
      * Clear completed downloads
      */
-    public function clearCompleted(): void {
+    public function clearCompleted() {
         $queue = $this->loadQueue();
         foreach ($queue['downloads'] as $id => $dl) {
             if ($dl['status'] === 'completed') {
@@ -369,9 +372,9 @@ class DownloadQueue {
     /**
      * Get queue statistics
      */
-    public function getStats(): array {
+    public function getStats() {
         $queue = $this->loadQueue();
-        $stats = [
+        $stats = array(
             'total' => count($queue['downloads']),
             'queued' => 0,
             'downloading' => 0,
@@ -379,10 +382,10 @@ class DownloadQueue {
             'completed' => 0,
             'error' => 0,
             'max_concurrent' => $this->maxConcurrent
-        ];
+        );
         
         foreach ($queue['downloads'] as $dl) {
-            $status = $dl['status'] ?? 'queued';
+            $status = isset($dl['status']) ? $dl['status'] : 'queued';
             if (isset($stats[$status])) {
                 $stats[$status]++;
             }
@@ -396,23 +399,16 @@ class DownloadQueue {
  * Chunk Downloader - Downloads a single chunk
  */
 class ChunkDownloader {
-    private DownloadQueue $queue;
+    private $queue;
     
-    public function __construct(DownloadQueue $queue) {
+    public function __construct($queue) {
         $this->queue = $queue;
     }
     
     /**
      * Download a single chunk
      */
-    public function downloadChunk(
-        string $downloadId, 
-        int $chunkId, 
-        string $url, 
-        int $start, 
-        int $end, 
-        array $options = []
-    ): array {
+    public function downloadChunk($downloadId, $chunkId, $url, $start, $end, $options = array()) {
         $chunkFile = $this->queue->getChunkPath($downloadId, $chunkId);
         
         // Check if partially downloaded
@@ -424,25 +420,23 @@ class ChunkDownloader {
         $actualStart = $start + $existingSize;
         if ($actualStart > $end) {
             // Chunk already complete
-            return ['success' => true, 'downloaded' => $end - $start + 1];
+            return array('success' => true, 'downloaded' => $end - $start + 1);
         }
         
         $fp = fopen($chunkFile, 'ab');
         if (!$fp) {
-            return ['success' => false, 'error' => 'Cannot open chunk file'];
+            return array('success' => false, 'error' => 'Cannot open chunk file');
         }
         
         $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RANGE => $actualStart . '-' . $end,
-            CURLOPT_FILE => $fp,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_CONNECTTIMEOUT => 30
-        ]);
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RANGE, $actualStart . '-' . $end);
+        curl_setopt($ch, CURLOPT_FILE, $fp);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
         
         if (!empty($options['cookie'])) {
             curl_setopt($ch, CURLOPT_COOKIE, $options['cookie']);
@@ -457,10 +451,10 @@ class ChunkDownloader {
         curl_close($ch);
         fclose($fp);
         
-        if ($result === false || !in_array($httpCode, [200, 206], true)) {
-            return ['success' => false, 'error' => $error ?: "HTTP $httpCode"];
+        if ($result === false || !in_array($httpCode, array(200, 206), true)) {
+            return array('success' => false, 'error' => $error ? $error : "HTTP $httpCode");
         }
         
-        return ['success' => true, 'downloaded' => (int)filesize($chunkFile)];
+        return array('success' => true, 'downloaded' => (int)filesize($chunkFile));
     }
 }

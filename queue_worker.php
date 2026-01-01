@@ -1,8 +1,8 @@
 <?php
-declare(strict_types=1);
 /**
  * RapidLeech Queue Worker
  * Background process that downloads files with parallel chunks
+ * Compatible with PHP 7.x+
  */
 
 // Prevent timeout
@@ -13,7 +13,7 @@ ignore_user_abort(true);
 if (function_exists('fastcgi_finish_request')) {
     fastcgi_finish_request();
 } else {
-    ob_end_clean();
+    @ob_end_clean();
     header("Connection: close");
     header("Content-Length: 0");
     flush();
@@ -28,12 +28,12 @@ require_once CLASS_DIR . 'other.php';
 require_once CLASS_DIR . 'download_queue.php';
 
 // Set download directory
-if (!str_ends_with($options['download_dir'], '/')) {
+if (substr($options['download_dir'], -1) !== '/') {
     $options['download_dir'] .= '/';
 }
 define('DOWNLOAD_DIR', $options['download_dir']);
 
-$downloadId = $_GET['id'] ?? '';
+$downloadId = isset($_GET['id']) ? $_GET['id'] : '';
 if (empty($downloadId)) {
     exit;
 }
@@ -48,14 +48,14 @@ if (!$download || $download['status'] !== 'downloading') {
 /**
  * Download with parallel chunks using multi-curl
  */
-function downloadWithChunks(DownloadQueue $queue, array $download): array
+function downloadWithChunks($queue, $download)
 {
     $url = $download['url'];
     $options = $download['options'];
     $chunks = $download['chunks'];
     
     if (empty($chunks)) {
-        return ['success' => false, 'error' => 'No chunks defined'];
+        return array('success' => false, 'error' => 'No chunks defined');
     }
     
     // For non-resumable files or single chunk, use simple download
@@ -65,8 +65,8 @@ function downloadWithChunks(DownloadQueue $queue, array $download): array
     
     // Multi-curl for parallel chunk download
     $multiHandle = curl_multi_init();
-    $curlHandles = [];
-    $fileHandles = [];
+    $curlHandles = array();
+    $fileHandles = array();
     
     foreach ($chunks as $i => $chunk) {
         if ($chunk['status'] === 'completed') {
@@ -92,19 +92,17 @@ function downloadWithChunks(DownloadQueue $queue, array $download): array
         }
         
         $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RANGE => $actualStart . '-' . $chunk['end'],
-            CURLOPT_FILE => $fp,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_CONNECTTIMEOUT => 30,
-            CURLOPT_BUFFERSIZE => 65536,
-            CURLOPT_LOW_SPEED_LIMIT => 1024,
-            CURLOPT_LOW_SPEED_TIME => 30,
-        ]);
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RANGE, $actualStart . '-' . $chunk['end']);
+        curl_setopt($ch, CURLOPT_FILE, $fp);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_BUFFERSIZE, 65536);
+        curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1024);
+        curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 30);
         
         if (!empty($options['cookie'])) {
             curl_setopt($ch, CURLOPT_COOKIE, $options['cookie']);
@@ -120,7 +118,7 @@ function downloadWithChunks(DownloadQueue $queue, array $download): array
     }
     
     // Update chunks status
-    $queue->updateDownload($download['id'], ['chunks' => $chunks]);
+    $queue->updateDownload($download['id'], array('chunks' => $chunks));
     
     // Execute multi-curl
     $running = null;
@@ -140,10 +138,10 @@ function downloadWithChunks(DownloadQueue $queue, array $download): array
                 }
             }
             
-            $queue->updateDownload($download['id'], [
+            $queue->updateDownload($download['id'], array(
                 'downloaded' => $totalDownloaded,
                 'chunks' => $chunks
-            ]);
+            ));
             
             // Check if paused
             $currentStatus = $queue->getDownload($download['id']);
@@ -157,7 +155,7 @@ function downloadWithChunks(DownloadQueue $queue, array $download): array
                     fclose($fp);
                 }
                 curl_multi_close($multiHandle);
-                return ['success' => false, 'error' => 'Paused'];
+                return array('success' => false, 'error' => 'Paused');
             }
             
             $lastUpdate = time();
@@ -170,16 +168,16 @@ function downloadWithChunks(DownloadQueue $queue, array $download): array
     
     // Check results and close handles
     $allSuccess = true;
-    $errors = [];
+    $errors = array();
     
     foreach ($curlHandles as $i => $ch) {
         $error = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         
-        if (!empty($error) || !in_array($httpCode, [200, 206], true)) {
+        if (!empty($error) || !in_array($httpCode, array(200, 206), true)) {
             $allSuccess = false;
             $chunks[$i]['status'] = 'error';
-            $errors[] = "Chunk $i: " . ($error ?: "HTTP $httpCode");
+            $errors[] = "Chunk $i: " . ($error ? $error : "HTTP $httpCode");
         } else {
             $chunks[$i]['status'] = 'completed';
             $chunkFile = $queue->getChunkPath($download['id'], $chunks[$i]['id']);
@@ -197,19 +195,19 @@ function downloadWithChunks(DownloadQueue $queue, array $download): array
     curl_multi_close($multiHandle);
     
     // Update final chunk status
-    $queue->updateDownload($download['id'], ['chunks' => $chunks]);
+    $queue->updateDownload($download['id'], array('chunks' => $chunks));
     
     if (!$allSuccess) {
-        return ['success' => false, 'error' => implode('; ', $errors)];
+        return array('success' => false, 'error' => implode('; ', $errors));
     }
     
-    return ['success' => true];
+    return array('success' => true);
 }
 
 /**
  * Simple single-stream download for non-resumable files
  */
-function downloadSingle(DownloadQueue $queue, array $download): array
+function downloadSingle($queue, $download)
 {
     $url = $download['url'];
     $options = $download['options'];
@@ -217,29 +215,27 @@ function downloadSingle(DownloadQueue $queue, array $download): array
     
     $fp = fopen($filename, 'wb');
     if (!$fp) {
-        return ['success' => false, 'error' => 'Cannot create file'];
+        return array('success' => false, 'error' => 'Cannot create file');
     }
     
     $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_FILE => $fp,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_CONNECTTIMEOUT => 30,
-        CURLOPT_NOPROGRESS => false,
-    ]);
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_FILE, $fp);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_NOPROGRESS, false);
     
-    curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function($resource, $downloadSize, $downloaded, $uploadSize, $uploaded) use ($queue, $download): int {
+    curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function($resource, $downloadSize, $downloaded, $uploadSize, $uploaded) use ($queue, $download) {
         static $lastUpdate = 0;
         $now = time();
         if ($now - $lastUpdate >= 2) {
-            $queue->updateDownload($download['id'], [
+            $queue->updateDownload($download['id'], array(
                 'downloaded' => $downloaded,
                 'total_size' => $downloadSize > 0 ? $downloadSize : $download['total_size']
-            ]);
+            ));
             
             // Check if paused
             $currentStatus = $queue->getDownload($download['id']);
@@ -264,12 +260,12 @@ function downloadSingle(DownloadQueue $queue, array $download): array
     curl_close($ch);
     fclose($fp);
     
-    if ($result === false || !in_array($httpCode, [200, 206], true)) {
+    if ($result === false || !in_array($httpCode, array(200, 206), true)) {
         @unlink($filename);
-        return ['success' => false, 'error' => $error ?: "HTTP $httpCode"];
+        return array('success' => false, 'error' => $error ? $error : "HTTP $httpCode");
     }
     
-    return ['success' => true];
+    return array('success' => true);
 }
 
 // Main execution
@@ -281,28 +277,28 @@ try {
         if ($download['resumable'] && count($download['chunks']) > 1) {
             $mergeResult = $queue->mergeChunks($download);
             if (!$mergeResult) {
-                $queue->updateDownload($downloadId, [
+                $queue->updateDownload($downloadId, array(
                     'status' => 'error',
                     'error' => 'Failed to merge chunks'
-                ]);
+                ));
                 exit;
             }
         }
         
         // Mark as completed
-        $queue->updateDownload($downloadId, [
+        $queue->updateDownload($downloadId, array(
             'status' => 'completed',
             'completed_at' => time(),
             'downloaded' => $download['total_size']
-        ]);
+        ));
         
         // Add to files.lst
-        $fileRecord = [
+        $fileRecord = array(
             'name' => DOWNLOAD_DIR . $download['filename'],
             'size' => bytesToKbOrMbOrGb($download['total_size']),
             'date' => time(),
             'comment' => 'Downloaded via Queue'
-        ];
+        );
         $listFile = fopen(CONFIG_DIR . 'files.lst', 'a');
         if ($listFile) {
             fwrite($listFile, serialize($fileRecord) . "\n");
@@ -310,25 +306,23 @@ try {
         }
     } else {
         // Mark as error
-        $queue->updateDownload($downloadId, [
+        $queue->updateDownload($downloadId, array(
             'status' => 'error',
             'error' => $result['error']
-        ]);
+        ));
     }
     
     // Trigger next download in queue
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
     $ch = curl_init($protocol . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/ajax.php?ajax=queue_process');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 1,
-    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 1);
     curl_exec($ch);
     curl_close($ch);
     
 } catch (Exception $e) {
-    $queue->updateDownload($downloadId, [
+    $queue->updateDownload($downloadId, array(
         'status' => 'error',
         'error' => $e->getMessage()
-    ]);
+    ));
 }

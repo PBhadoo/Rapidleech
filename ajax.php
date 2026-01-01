@@ -8,6 +8,14 @@ require_once(CONFIG_DIR."config.php");
 require_once(CLASS_DIR . 'other.php');
 define ( 'TEMPLATE_DIR', 'templates/'.$options['template_used'].'/' );
 $nn = "\r\n";
+
+// Polyfill for PHP < 8.0
+if (!function_exists('str_ends_with')) {
+    function str_ends_with($haystack, $needle) {
+        return $needle === '' || substr($haystack, -strlen($needle)) === $needle;
+    }
+}
+
 // For ajax calls, lets make it use less resource as possible
 switch ($_GET['ajax']) {
 	case 'pending_downloads':
@@ -16,7 +24,7 @@ switch ($_GET['ajax']) {
 			$options['download_dir'] .= '/';
 		}
 		$download_dir = $options['download_dir'];
-		$pending = [];
+		$pending = array();
 		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
@@ -53,24 +61,24 @@ switch ($_GET['ajax']) {
 				}
 				
 				if ($isPending) {
-					$pending[] = [
+					$pending[] = array(
 						'filename' => $file,
 						'size' => bytesToKbOrMbOrGb($size),
 						'modified' => date('H:i:s', $mtime),
 						'status' => $status,
-						'progress' => 0, // Can't determine actual progress without additional tracking
+						'progress' => 0,
 						'age' => $age
-					];
+					);
 				}
 			}
 			closedir($dir);
 		}
 		
 		// Sort by most recently modified first
-		usort($pending, fn($a, $b) => $a['age'] - $b['age']);
+		usort($pending, function($a, $b) { return $a['age'] - $b['age']; });
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['downloads' => $pending]);
+		echo array_to_json(array('downloads' => $pending));
 		break;
 	
 	case 'queue_status':
@@ -85,7 +93,7 @@ switch ($_GET['ajax']) {
 			$options['download_dir'] .= '/';
 		}
 		$download_dir = $options['download_dir'];
-		$pending = [];
+		$pending = array();
 		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
@@ -116,30 +124,30 @@ switch ($_GET['ajax']) {
 				}
 				
 				if ($isPending) {
-					$pending[] = [
+					$pending[] = array(
 						'filename' => $file,
 						'size' => bytesToKbOrMbOrGb($size),
 						'status' => $status,
 						'age' => $age
-					];
+					);
 				}
 			}
 			closedir($dir);
 		}
 		
 		// Sort by most recently modified first
-		usort($pending, fn($a, $b) => $a['age'] - $b['age']);
+		usort($pending, function($a, $b) { return $a['age'] - $b['age']; });
 		
 		// Format queue downloads for display
-		$formatted = [];
+		$formatted = array();
 		foreach ($downloads as $dl) {
 			$progress = 0;
 			if ($dl['total_size'] > 0) {
 				$progress = round(($dl['downloaded'] / $dl['total_size']) * 100, 1);
 			}
-			$formatted[] = [
+			$formatted[] = array(
 				'id' => $dl['id'],
-				'filename' => $dl['filename'] ?: basename(parse_url($dl['url'], PHP_URL_PATH)),
+				'filename' => $dl['filename'] ? $dl['filename'] : basename(parse_url($dl['url'], PHP_URL_PATH)),
 				'url' => $dl['url'],
 				'status' => $dl['status'],
 				'size' => $dl['total_size'] > 0 ? bytesToKbOrMbOrGb($dl['total_size']) : 'Unknown',
@@ -150,11 +158,11 @@ switch ($_GET['ajax']) {
 				'chunks' => count($dl['chunks']),
 				'error' => $dl['error'],
 				'added' => date('H:i:s', $dl['added_at'])
-			];
+			);
 		}
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['downloads' => $formatted, 'pending' => $pending, 'stats' => $stats]);
+		echo array_to_json(array('downloads' => $formatted, 'pending' => $pending, 'stats' => $stats));
 		break;
 	
 	case 'queue_add':
@@ -164,21 +172,21 @@ switch ($_GET['ajax']) {
 		
 		$url = isset($_POST['url']) ? trim($_POST['url']) : '';
 		$filename = isset($_POST['filename']) ? trim($_POST['filename']) : '';
-		$opts = [
-			'referer' => $_POST['referer'] ?? '',
-			'cookie' => $_POST['cookie'] ?? ''
-		];
+		$opts = array(
+			'referer' => isset($_POST['referer']) ? $_POST['referer'] : '',
+			'cookie' => isset($_POST['cookie']) ? $_POST['cookie'] : ''
+		);
 		
 		if (empty($url)) {
 			header('Content-Type: application/json');
-			echo array_to_json(['success' => false, 'error' => 'URL is required']);
+			echo array_to_json(array('success' => false, 'error' => 'URL is required'));
 			break;
 		}
 		
 		$id = $queue->addToQueue($url, $filename, $opts);
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['success' => true, 'id' => $id]);
+		echo array_to_json(array('success' => true, 'id' => $id));
 		break;
 	
 	case 'queue_remove':
@@ -186,11 +194,11 @@ switch ($_GET['ajax']) {
 		require_once CLASS_DIR . 'download_queue.php';
 		$queue = new DownloadQueue();
 		
-		$id = $_POST['id'] ?? '';
+		$id = isset($_POST['id']) ? $_POST['id'] : '';
 		$result = $queue->removeFromQueue($id);
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['success' => $result]);
+		echo array_to_json(array('success' => $result));
 		break;
 	
 	case 'queue_pause':
@@ -198,11 +206,11 @@ switch ($_GET['ajax']) {
 		require_once CLASS_DIR . 'download_queue.php';
 		$queue = new DownloadQueue();
 		
-		$id = $_POST['id'] ?? '';
+		$id = isset($_POST['id']) ? $_POST['id'] : '';
 		$result = $queue->pauseDownload($id);
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['success' => $result]);
+		echo array_to_json(array('success' => $result));
 		break;
 	
 	case 'queue_resume':
@@ -210,11 +218,11 @@ switch ($_GET['ajax']) {
 		require_once CLASS_DIR . 'download_queue.php';
 		$queue = new DownloadQueue();
 		
-		$id = $_POST['id'] ?? '';
+		$id = isset($_POST['id']) ? $_POST['id'] : '';
 		$result = $queue->resumeDownload($id);
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['success' => $result]);
+		echo array_to_json(array('success' => $result));
 		break;
 	
 	case 'queue_clear_completed':
@@ -224,7 +232,7 @@ switch ($_GET['ajax']) {
 		$queue->clearCompleted();
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['success' => true]);
+		echo array_to_json(array('success' => true));
 		break;
 	
 	case 'queue_process':
@@ -245,26 +253,26 @@ switch ($_GET['ajax']) {
 			// Check resume support and file size
 			$info = $queue->checkResumeSupport($next['url'], $next['options']);
 			
-			$updates = [
+			$updates = array(
 				'status' => 'downloading',
 				'started_at' => time(),
 				'total_size' => $info['size'],
 				'resumable' => $info['resumable'],
-				'filename' => $next['filename'] ?: $info['filename']
-			];
+				'filename' => $next['filename'] ? $next['filename'] : $info['filename']
+			);
 			
 			// Create chunks if resumable
 			if ($info['resumable'] && $info['size'] > 0) {
 				$updates['chunks'] = $queue->createChunks($info['size']);
 			} else {
 				// Single chunk for non-resumable
-				$updates['chunks'] = [[
+				$updates['chunks'] = array(array(
 					'id' => 0,
 					'start' => 0,
 					'end' => $info['size'] > 0 ? $info['size'] - 1 : 0,
 					'downloaded' => 0,
 					'status' => 'pending'
-				]];
+				));
 			}
 			
 			$queue->updateDownload($next['id'], $updates);
@@ -276,17 +284,15 @@ switch ($_GET['ajax']) {
 			
 			// Use curl to trigger async
 			$ch = curl_init($processUrl);
-			curl_setopt_array($ch, [
-				CURLOPT_RETURNTRANSFER => true,
-				CURLOPT_TIMEOUT => 1,
-				CURLOPT_NOSIGNAL => 1,
-			]);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+			curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
 			curl_exec($ch);
 			curl_close($ch);
 		}
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['success' => true, 'started' => $started]);
+		echo array_to_json(array('success' => true, 'started' => $started));
 		break;
 	
 	case 'server_stats':
