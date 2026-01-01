@@ -25,6 +25,7 @@ switch ($_GET['ajax']) {
 		}
 		$download_dir = $options['download_dir'];
 		$pending = array();
+		$chunkGroups = array(); // Group chunk files by base name
 		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
@@ -41,6 +42,27 @@ switch ($_GET['ajax']) {
 				$mtime = @filemtime($filepath);
 				$size = @filesize($filepath);
 				$age = $now - $mtime;
+				
+				// Check for parallel download chunk files (.chunk_*_*.tmp)
+				if (preg_match('/^\.chunk_([a-f0-9]+)_(\d+)\.tmp$/', $file, $matches)) {
+					$chunkGroup = $matches[1];
+					$chunkNum = (int)$matches[2];
+					if (!isset($chunkGroups[$chunkGroup])) {
+						$chunkGroups[$chunkGroup] = array(
+							'chunks' => array(),
+							'total_size' => 0,
+							'latest_mtime' => 0,
+							'age' => $age
+						);
+					}
+					$chunkGroups[$chunkGroup]['chunks'][$chunkNum] = $size;
+					$chunkGroups[$chunkGroup]['total_size'] += $size;
+					if ($mtime > $chunkGroups[$chunkGroup]['latest_mtime']) {
+						$chunkGroups[$chunkGroup]['latest_mtime'] = $mtime;
+						$chunkGroups[$chunkGroup]['age'] = $age;
+					}
+					continue;
+				}
 				
 				// Consider as pending if:
 				// 1. Has .part extension (download in progress)
@@ -74,6 +96,20 @@ switch ($_GET['ajax']) {
 			closedir($dir);
 		}
 		
+		// Add parallel chunk downloads as single entries
+		foreach ($chunkGroups as $hash => $group) {
+			$numChunks = count($group['chunks']);
+			$pending[] = array(
+				'filename' => 'Parallel Download (' . $numChunks . ' chunks)',
+				'size' => bytesToKbOrMbOrGb($group['total_size']),
+				'modified' => date('H:i:s', $group['latest_mtime']),
+				'status' => 'Downloading ' . $numChunks . ' chunks...',
+				'progress' => 0,
+				'age' => $group['age'],
+				'parallel' => true
+			);
+		}
+		
 		// Sort by most recently modified first
 		usort($pending, function($a, $b) { return $a['age'] - $b['age']; });
 		
@@ -94,6 +130,7 @@ switch ($_GET['ajax']) {
 		}
 		$download_dir = $options['download_dir'];
 		$pending = array();
+		$chunkGroups = array();
 		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
@@ -110,6 +147,27 @@ switch ($_GET['ajax']) {
 				$mtime = @filemtime($filepath);
 				$size = @filesize($filepath);
 				$age = $now - $mtime;
+				
+				// Check for parallel download chunk files (.chunk_*_*.tmp)
+				if (preg_match('/^\.chunk_([a-f0-9]+)_(\d+)\.tmp$/', $file, $matches)) {
+					$chunkGroup = $matches[1];
+					$chunkNum = (int)$matches[2];
+					if (!isset($chunkGroups[$chunkGroup])) {
+						$chunkGroups[$chunkGroup] = array(
+							'chunks' => array(),
+							'total_size' => 0,
+							'latest_mtime' => 0,
+							'age' => $age
+						);
+					}
+					$chunkGroups[$chunkGroup]['chunks'][$chunkNum] = $size;
+					$chunkGroups[$chunkGroup]['total_size'] += $size;
+					if ($mtime > $chunkGroups[$chunkGroup]['latest_mtime']) {
+						$chunkGroups[$chunkGroup]['latest_mtime'] = $mtime;
+						$chunkGroups[$chunkGroup]['age'] = $age;
+					}
+					continue;
+				}
 				
 				// Consider as pending if: .part/.tmp/.download extension OR recently modified
 				$isPending = false;
@@ -133,6 +191,18 @@ switch ($_GET['ajax']) {
 				}
 			}
 			closedir($dir);
+		}
+		
+		// Add parallel chunk downloads as single entries
+		foreach ($chunkGroups as $hash => $group) {
+			$numChunks = count($group['chunks']);
+			$pending[] = array(
+				'filename' => 'Parallel Download (' . $numChunks . ' chunks)',
+				'size' => bytesToKbOrMbOrGb($group['total_size']),
+				'status' => 'Downloading ' . $numChunks . ' chunks...',
+				'age' => $group['age'],
+				'parallel' => true
+			);
 		}
 		
 		// Sort by most recently modified first
