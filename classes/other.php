@@ -224,6 +224,8 @@ function _create_list() {
 		$dir = dir(DOWNLOAD_DIR);
 		while(false !== ($file = $dir->read())) {
 			if ($file == '.' || $file == '..' || ($tmp = file_data_size_time(DOWNLOAD_DIR.$file)) === false) continue;
+			// Skip .tmp files and chunk temp files
+			if (preg_match('/\.tmp$/i', $file) || preg_match('/\.rl_chunk_\d+\.tmp$/i', $file) || preg_match('/\.part$/i', $file)) continue;
 			list($size, $time) = $tmp;
 			if (!is_array($GLOBALS['options']['forbidden_filetypes']) || !in_array(strtolower(strrchr($file, '.')), $GLOBALS['options']['forbidden_filetypes'])) {
 				$file = DOWNLOAD_DIR . $file;
@@ -254,6 +256,15 @@ function _create_list() {
 					if (!empty($date)) $glist[$date] = $listReformat[$key];
 				}
 				unset($glist[$key], $listReformat[$key]);
+			}
+		}
+	}
+	// Filter out .tmp, .part, and chunk temp files from the list
+	foreach($glist as $key => $item) {
+		if (isset($item['name'])) {
+			$filename = basename($item['name']);
+			if (preg_match('/\.tmp$/i', $filename) || preg_match('/\.rl_chunk_\d+\.tmp$/i', $filename) || preg_match('/\.part$/i', $filename)) {
+				unset($glist[$key]);
 			}
 		}
 	}
