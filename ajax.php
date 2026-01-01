@@ -78,7 +78,7 @@ switch ($_GET['ajax']) {
 		usort($pending, function($a, $b) { return $a['age'] - $b['age']; });
 		
 		header('Content-Type: application/json');
-		echo array_to_json(array('downloads' => $pending));
+		echo json_encode(array('downloads' => $pending));
 		break;
 	
 	case 'queue_status':
@@ -162,7 +162,7 @@ switch ($_GET['ajax']) {
 		}
 		
 		header('Content-Type: application/json');
-		echo array_to_json(array('downloads' => $formatted, 'pending' => $pending, 'stats' => $stats));
+		echo json_encode(array('downloads' => $formatted, 'pending' => $pending, 'stats' => $stats));
 		break;
 	
 	case 'queue_add':
@@ -179,14 +179,14 @@ switch ($_GET['ajax']) {
 		
 		if (empty($url)) {
 			header('Content-Type: application/json');
-			echo array_to_json(array('success' => false, 'error' => 'URL is required'));
+			echo json_encode(array('success' => false, 'error' => 'URL is required'));
 			break;
 		}
 		
 		$id = $queue->addToQueue($url, $filename, $opts);
 		
 		header('Content-Type: application/json');
-		echo array_to_json(array('success' => true, 'id' => $id));
+		echo json_encode(array('success' => true, 'id' => $id));
 		break;
 	
 	case 'queue_remove':
@@ -198,7 +198,7 @@ switch ($_GET['ajax']) {
 		$result = $queue->removeFromQueue($id);
 		
 		header('Content-Type: application/json');
-		echo array_to_json(array('success' => $result));
+		echo json_encode(array('success' => $result));
 		break;
 	
 	case 'queue_pause':
@@ -210,7 +210,7 @@ switch ($_GET['ajax']) {
 		$result = $queue->pauseDownload($id);
 		
 		header('Content-Type: application/json');
-		echo array_to_json(array('success' => $result));
+		echo json_encode(array('success' => $result));
 		break;
 	
 	case 'queue_resume':
@@ -222,7 +222,7 @@ switch ($_GET['ajax']) {
 		$result = $queue->resumeDownload($id);
 		
 		header('Content-Type: application/json');
-		echo array_to_json(array('success' => $result));
+		echo json_encode(array('success' => $result));
 		break;
 	
 	case 'queue_clear_completed':
@@ -232,7 +232,7 @@ switch ($_GET['ajax']) {
 		$queue->clearCompleted();
 		
 		header('Content-Type: application/json');
-		echo array_to_json(array('success' => true));
+		echo json_encode(array('success' => true));
 		break;
 	
 	case 'queue_process':
@@ -292,7 +292,7 @@ switch ($_GET['ajax']) {
 		}
 		
 		header('Content-Type: application/json');
-		echo array_to_json(array('success' => true, 'started' => $started));
+		echo json_encode(array('success' => true, 'started' => $started));
 		break;
 	
 	case 'server_stats':
