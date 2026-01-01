@@ -475,21 +475,6 @@ if (!defined('RAPIDLEECH')) {
                         </div>
                     </div>
                     
-                    <!-- Parallel Download Info -->
-                    <div class="rl-card" style="margin-bottom: 20px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); color: white; padding: 16px;">
-                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                            <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M13 5v6h1.17L12 13.17 9.83 11H11V5h2m2-2H9v6H5l7 7 7-7h-4V3zm4 15H5v2h14v-2z"/>
-                            </svg>
-                            <div style="flex: 1;">
-                                <strong style="font-size: 14px;">IDM-Style Parallel Downloading</strong>
-                                <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">
-                                    8 chunks per file • Max 5 concurrent downloads • Auto-resume support
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <!-- Queue Controls -->
                     <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
                         <button onclick="refreshQueue();" class="rl-btn rl-btn-secondary rl-btn-sm">
@@ -683,17 +668,22 @@ if (!defined('RAPIDLEECH')) {
                     
                     // First show pending file downloads (from filesystem)
                     if (pending.length > 0) {
-                        html += '<div style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: var(--radius-md); border-left: 4px solid var(--accent-primary);">';
-                        html += '<strong style="color: var(--text-primary);">Active File Downloads</strong>';
-                        html += '<div style="margin-top: 10px;">';
+                        html += '<div style="margin-bottom: 16px;">';
                         for (var p = 0; p < pending.length; p++) {
                             var pf = pending[p];
-                            html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color);">';
-                            html += '<span style="word-break: break-all; flex: 1; margin-right: 12px;">' + escapeHtml(pf.filename) + '</span>';
-                            html += '<span style="color: var(--text-muted); white-space: nowrap;">' + pf.size + ' • ' + pf.status + '</span>';
+                            var progressPct = pf.progress || 0;
+                            html += '<div class="queue-item downloading" style="margin-bottom: 8px;">';
+                            html += '<div class="queue-header">';
+                            html += '<div class="queue-filename">' + escapeHtml(pf.filename) + '</div>';
+                            html += '<span class="queue-status downloading">' + pf.status + '</span>';
+                            html += '</div>';
+                            html += '<div class="queue-meta"><span>' + pf.size + '</span></div>';
+                            if (progressPct > 0) {
+                                html += '<div class="queue-progress"><div class="queue-progress-bar" style="width: ' + progressPct + '%"></div></div>';
+                            }
                             html += '</div>';
                         }
-                        html += '</div></div>';
+                        html += '</div>';
                     }
                     
                     if (downloads.length === 0 && pending.length === 0) {
@@ -703,7 +693,6 @@ if (!defined('RAPIDLEECH')) {
                         html += '<br><small>Start a transload to see downloads here</small>';
                         html += '</div>';
                     } else if (downloads.length > 0) {
-                        html += '<div style="margin-top: 8px;"><strong style="color: var(--text-primary);">Parallel Queue Downloads</strong></div>';
                         for (var i = 0; i < downloads.length; i++) {
                             var dl = downloads[i];
                             html += '<div class="queue-item ' + dl.status + '">';
@@ -720,12 +709,6 @@ if (!defined('RAPIDLEECH')) {
                             html += '<span><strong>Downloaded:</strong> ' + dl.downloaded + '</span>';
                             if (dl.speed && dl.speed != '-') {
                                 html += '<span><strong>Speed:</strong> ' + dl.speed + '</span>';
-                            }
-                            if (dl.resumable !== null) {
-                                html += '<span>' + (dl.resumable ? '✓ Resumable' : '✗ No resume') + '</span>';
-                            }
-                            if (dl.chunks > 1) {
-                                html += '<span><strong>Chunks:</strong> ' + dl.chunks + '</span>';
                             }
                             html += '</div>';
                             

@@ -1040,7 +1040,6 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
     
     $fileSizeDisplay = bytesToKbOrMbOrGb($fileSize);
     echo(lang(104) . " <b>$FileName</b>, " . lang(56) . " <b>$fileSizeDisplay</b>...<br />");
-    echo "<p><b>Using parallel download with $numChunks chunks</b></p>";
     
     require_once(TEMPLATE_DIR . '/transloadui.php');
     flush();

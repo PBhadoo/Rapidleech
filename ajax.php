@@ -26,6 +26,7 @@ switch ($_GET['ajax']) {
 		$download_dir = $options['download_dir'];
 		$pending = array();
 		$chunkGroups = array(); // Group chunk files by base name
+		$metaFiles = array(); // Store metadata files
 		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
@@ -42,6 +43,19 @@ switch ($_GET['ajax']) {
 				$mtime = @filemtime($filepath);
 				$size = @filesize($filepath);
 				$age = $now - $mtime;
+				
+				// Check for metadata files (.chunk_*.meta)
+				if (preg_match('/^\.chunk_([a-f0-9]+)\.meta$/', $file, $matches)) {
+					$metaHash = $matches[1];
+					$metaContent = @file_get_contents($filepath);
+					if ($metaContent) {
+						$metaData = @json_decode($metaContent, true);
+						if ($metaData) {
+							$metaFiles[$metaHash] = $metaData;
+						}
+					}
+					continue;
+				}
 				
 				// Check for parallel download chunk files (.chunk_*_*.tmp)
 				if (preg_match('/^\.chunk_([a-f0-9]+)_(\d+)\.tmp$/', $file, $matches)) {
@@ -100,30 +114,29 @@ switch ($_GET['ajax']) {
 		foreach ($chunkGroups as $hash => $group) {
 			$numChunks = count($group['chunks']);
 			
-			// Try to get actual filename from metadata file
-			$metaFile = $download_dir . '.chunk_' . $hash . '.meta';
-			$filename = 'Parallel Download (' . $numChunks . ' chunks)';
+			// Try to get actual filename from pre-collected metadata
+			$filename = 'Downloading...';
 			$totalSize = $group['total_size'];
 			
-			if (file_exists($metaFile)) {
-				$meta = @json_decode(@file_get_contents($metaFile), true);
-				if ($meta && isset($meta['filename'])) {
+			if (isset($metaFiles[$hash])) {
+				$meta = $metaFiles[$hash];
+				if (isset($meta['filename'])) {
 					$filename = $meta['filename'];
-					if (isset($meta['filesize'])) {
-						$totalSize = $meta['filesize'];
-					}
+				}
+				if (isset($meta['filesize'])) {
+					$totalSize = $meta['filesize'];
 				}
 			}
+			
+			$progressPercent = ($totalSize > 0) ? round(($group['total_size'] / $totalSize) * 100, 1) : 0;
 			
 			$pending[] = array(
 				'filename' => $filename,
 				'size' => bytesToKbOrMbOrGb($group['total_size']) . ' / ' . bytesToKbOrMbOrGb($totalSize),
 				'modified' => date('H:i:s', $group['latest_mtime']),
-				'status' => 'Downloading ' . $numChunks . ' chunks...',
-				'progress' => ($totalSize > 0) ? round(($group['total_size'] / $totalSize) * 100, 1) : 0,
-				'age' => $group['age'],
-				'parallel' => true,
-				'chunks' => $numChunks
+				'status' => 'Downloading... ' . $progressPercent . '%',
+				'progress' => $progressPercent,
+				'age' => $group['age']
 			);
 		}
 		
