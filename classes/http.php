@@ -393,8 +393,21 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 		if (!empty($Resume['use']) && $Resume['use'] === TRUE && stripos($header, "\nContent-Range: ") !== false) {
 			list($temp, $Resume['range']) = explode(' ', trim(cut_str($header, "\nContent-Range: ", "\n")));
 			list($Resume['range'], $fileSize) = explode('/', $Resume['range']);
+			$fileSizeBytes = (int)$fileSize;
 			$fileSize = bytesToKbOrMbOrGb($fileSize);
-		} else $fileSize = bytesToKbOrMbOrGb($bytesTotal);
+		} else {
+			$fileSizeBytes = (int)$bytesTotal;
+			$fileSize = bytesToKbOrMbOrGb($bytesTotal);
+		}
+		
+		// Create metadata file to track download progress for pending downloads display
+		$metaFile = dirname($saveToFile) . '/.' . basename($saveToFile) . '.meta';
+		@file_put_contents($metaFile, json_encode(array(
+			'filename' => $FileName,
+			'filesize' => $fileSizeBytes,
+			'started' => time()
+		)));
+		
 		$chunkSize = GetChunkSize($bytesTotal);
 		echo(lang(104) . " <b>$FileName</b>, " . lang(56) . " <b>$fileSize</b>...<br />");
 
@@ -454,6 +467,11 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 	stream_socket_shutdown($fp, STREAM_SHUT_RDWR);
 	fclose($fp);
 	if ($saveToFile) {
+		// Cleanup metadata file on completion
+		$metaFile = dirname($saveToFile) . '/.' . basename($saveToFile) . '.meta';
+		if (file_exists($metaFile)) {
+			@unlink($metaFile);
+		}
 		return array('time' => sec2time(round($time)), 'speed' => @round($bytesTotal / 1024 / (microtime(true) - $timeStart), 2), 'received' => true, 'size' => $fileSize, 'bytesReceived' => ($bytesReceived + $Resume['from']), 'bytesTotal' => ($bytesTotal + $Resume ['from']), 'file' => $saveToFile, 'name' => $FileName);
 	} else {
 		if (empty($sFilters['dechunk']) && stripos($header, "\nTransfer-Encoding: chunked") !== false && function_exists('http_chunked_decode')) {

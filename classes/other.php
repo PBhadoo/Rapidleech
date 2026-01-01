@@ -224,8 +224,8 @@ function _create_list() {
 		$dir = dir(DOWNLOAD_DIR);
 		while(false !== ($file = $dir->read())) {
 			if ($file == '.' || $file == '..' || ($tmp = file_data_size_time(DOWNLOAD_DIR.$file)) === false) continue;
-			// Skip .tmp files, .meta files, .part files, and chunk temp files (hidden files starting with .)
-			if (preg_match('/\.tmp$/i', $file) || preg_match('/\.meta$/i', $file) || preg_match('/\.part$/i', $file) || preg_match('/^\.chunk_/i', $file)) continue;
+			// Skip .tmp files, .meta files, .part files, and hidden files starting with .
+			if (preg_match('/\.tmp$/i', $file) || preg_match('/\.meta$/i', $file) || preg_match('/\.part$/i', $file) || preg_match('/^\./i', $file)) continue;
 			list($size, $time) = $tmp;
 			if (!is_array($GLOBALS['options']['forbidden_filetypes']) || !in_array(strtolower(strrchr($file, '.')), $GLOBALS['options']['forbidden_filetypes'])) {
 				$file = DOWNLOAD_DIR . $file;
@@ -263,7 +263,7 @@ function _create_list() {
 	foreach($glist as $key => $item) {
 		if (isset($item['name'])) {
 			$filename = basename($item['name']);
-			if (preg_match('/\.tmp$/i', $filename) || preg_match('/\.meta$/i', $filename) || preg_match('/\.part$/i', $filename) || preg_match('/^\.chunk_/i', $filename)) {
+			if (preg_match('/\.tmp$/i', $filename) || preg_match('/\.meta$/i', $filename) || preg_match('/\.part$/i', $filename) || preg_match('/^\./i', $filename)) {
 				unset($glist[$key]);
 			}
 		}

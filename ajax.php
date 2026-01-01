@@ -26,7 +26,8 @@ switch ($_GET['ajax']) {
 		$download_dir = $options['download_dir'];
 		$pending = array();
 		$chunkGroups = array(); // Group chunk files by base name
-		$metaFiles = array(); // Store metadata files
+		$metaFiles = array(); // Store metadata files for chunk downloads
+		$fileMetaFiles = array(); // Store metadata files for single-stream downloads
 		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
@@ -44,7 +45,7 @@ switch ($_GET['ajax']) {
 				$size = @filesize($filepath);
 				$age = $now - $mtime;
 				
-				// Check for metadata files (.chunk_*.meta)
+				// Check for chunk metadata files (.chunk_*.meta)
 				if (preg_match('/^\.chunk_([a-f0-9]+)\.meta$/', $file, $matches)) {
 					$metaHash = $matches[1];
 					$metaContent = @file_get_contents($filepath);
@@ -52,6 +53,19 @@ switch ($_GET['ajax']) {
 						$metaData = @json_decode($metaContent, true);
 						if ($metaData) {
 							$metaFiles[$metaHash] = $metaData;
+						}
+					}
+					continue;
+				}
+				
+				// Check for per-file metadata (.<filename>.meta)
+				if (preg_match('/^\.(.+)\.meta$/', $file, $matches)) {
+					$originalFile = $matches[1];
+					$metaContent = @file_get_contents($filepath);
+					if ($metaContent) {
+						$metaData = @json_decode($metaContent, true);
+						if ($metaData) {
+							$fileMetaFiles[$originalFile] = $metaData;
 						}
 					}
 					continue;
@@ -90,19 +104,33 @@ switch ($_GET['ajax']) {
 					$status = 'Downloading...';
 				} elseif ($age < 60) {
 					$isPending = true;
-					$status = 'Active (' . $age . 's ago)';
+					$status = 'Downloading...';
 				} elseif ($age < 300 && $size === 0) {
 					$isPending = true;
 					$status = 'Starting...';
 				}
 				
 				if ($isPending) {
+					// Check if we have metadata for this file
+					$totalSize = 0;
+					$progress = 0;
+					$sizeDisplay = bytesToKbOrMbOrGb($size);
+					
+					if (isset($fileMetaFiles[$file]) && isset($fileMetaFiles[$file]['filesize'])) {
+						$totalSize = $fileMetaFiles[$file]['filesize'];
+						if ($totalSize > 0) {
+							$progress = round(($size / $totalSize) * 100, 1);
+							$sizeDisplay = bytesToKbOrMbOrGb($size) . ' / ' . bytesToKbOrMbOrGb($totalSize);
+							$status = $progress . '%';
+						}
+					}
+					
 					$pending[] = array(
 						'filename' => $file,
-						'size' => bytesToKbOrMbOrGb($size),
+						'size' => $sizeDisplay,
 						'modified' => date('H:i:s', $mtime),
 						'status' => $status,
-						'progress' => 0,
+						'progress' => $progress,
 						'age' => $age
 					);
 				}
@@ -140,8 +168,8 @@ switch ($_GET['ajax']) {
 			);
 		}
 		
-		// Sort by most recently modified first
-		usort($pending, function($a, $b) { return $a['age'] - $b['age']; });
+		// Sort by filename alphabetically (ascending)
+		usort($pending, function($a, $b) { return strcasecmp($a['filename'], $b['filename']); });
 		
 		header('Content-Type: application/json');
 		echo json_encode(array('downloads' => $pending));
@@ -161,7 +189,8 @@ switch ($_GET['ajax']) {
 		$download_dir = $options['download_dir'];
 		$pending = array();
 		$chunkGroups = array();
-		$metaFiles = array(); // Store metadata files
+		$metaFiles = array(); // Store metadata files for chunk downloads
+		$fileMetaFiles = array(); // Store metadata files for single-stream downloads
 		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
@@ -179,7 +208,7 @@ switch ($_GET['ajax']) {
 				$size = @filesize($filepath);
 				$age = $now - $mtime;
 				
-				// Check for metadata files (.chunk_*.meta)
+				// Check for chunk metadata files (.chunk_*.meta)
 				if (preg_match('/^\.chunk_([a-f0-9]+)\.meta$/', $file, $matches)) {
 					$metaHash = $matches[1];
 					$metaContent = @file_get_contents($filepath);
@@ -191,6 +220,20 @@ switch ($_GET['ajax']) {
 					}
 					continue;
 				}
+				
+				// Check for per-file metadata (.<filename>.meta)
+				if (preg_match('/^\.(.+)\.meta$/', $file, $matches)) {
+					$originalFile = $matches[1];
+					$metaContent = @file_get_contents($filepath);
+					if ($metaContent) {
+						$metaData = @json_decode($metaContent, true);
+						if ($metaData) {
+							$fileMetaFiles[$originalFile] = $metaData;
+						}
+					}
+					continue;
+				}
+				
 				$mtime = @filemtime($filepath);
 				$size = @filesize($filepath);
 				$age = $now - $mtime;
@@ -225,14 +268,29 @@ switch ($_GET['ajax']) {
 					$status = 'Downloading...';
 				} elseif ($age < 30) {
 					$isPending = true;
-					$status = 'Active';
+					$status = 'Downloading...';
 				}
 				
 				if ($isPending) {
+					// Check if we have metadata for this file
+					$totalSize = 0;
+					$progress = 0;
+					$sizeDisplay = bytesToKbOrMbOrGb($size);
+					
+					if (isset($fileMetaFiles[$file]) && isset($fileMetaFiles[$file]['filesize'])) {
+						$totalSize = $fileMetaFiles[$file]['filesize'];
+						if ($totalSize > 0) {
+							$progress = round(($size / $totalSize) * 100, 1);
+							$sizeDisplay = bytesToKbOrMbOrGb($size) . ' / ' . bytesToKbOrMbOrGb($totalSize);
+							$status = $progress . '%';
+						}
+					}
+					
 					$pending[] = array(
 						'filename' => $file,
-						'size' => bytesToKbOrMbOrGb($size),
+						'size' => $sizeDisplay,
 						'status' => $status,
+						'progress' => $progress,
 						'age' => $age
 					);
 				}
@@ -267,8 +325,8 @@ switch ($_GET['ajax']) {
 			);
 		}
 		
-		// Sort by most recently modified first
-		usort($pending, function($a, $b) { return $a['age'] - $b['age']; });
+		// Sort by filename alphabetically (ascending)
+		usort($pending, function($a, $b) { return strcasecmp($a['filename'], $b['filename']); });
 		
 		// Format queue downloads for display
 		$formatted = array();
