@@ -63,7 +63,10 @@ $default_options = array(
 'forbidden_filetypes_block' => false, # false - rename forbidden_filetypes, true - completely block them
 'rename_these_filetypes_to' => '.xxx', # If forbidden_filetypes_block = false then rename those filetypes to this
 'check_these_before_unzipping' => true, # true - Don't allow extraction/creation of these filetypes from file actions
-'fgc' => 0
+'fgc' => 0,
+//Parallel Download
+'parallel_download' => true, # true - Enable parallel chunk download for resumable links (like IDM)
+'parallel_chunks' => 8 # Number of chunks to split file into for parallel download
 );
 /*Default Options End*/
 ?>
