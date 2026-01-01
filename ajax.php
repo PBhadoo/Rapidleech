@@ -74,13 +74,63 @@ switch ($_GET['ajax']) {
 		break;
 	
 	case 'queue_status':
-		// Get download queue status
+		// Get download queue status AND pending file downloads
 		require_once CLASS_DIR . 'download_queue.php';
 		$queue = new DownloadQueue();
 		$downloads = $queue->getAllDownloads();
 		$stats = $queue->getStats();
 		
-		// Format downloads for display
+		// Get pending file downloads from filesystem
+		if (!str_ends_with($options['download_dir'], '/')) {
+			$options['download_dir'] .= '/';
+		}
+		$download_dir = $options['download_dir'];
+		$pending = [];
+		
+		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
+			$now = time();
+			while (($file = readdir($dir)) !== false) {
+				if ($file === '.' || $file === '..') {
+					continue;
+				}
+				$filepath = $download_dir . $file;
+				if (!is_file($filepath)) {
+					continue;
+				}
+				
+				$ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+				$mtime = @filemtime($filepath);
+				$size = @filesize($filepath);
+				$age = $now - $mtime;
+				
+				// Consider as pending if: .part/.tmp/.download extension OR recently modified
+				$isPending = false;
+				$status = '';
+				
+				if ($ext === 'part' || $ext === 'tmp' || $ext === 'download') {
+					$isPending = true;
+					$status = 'Downloading...';
+				} elseif ($age < 30) {
+					$isPending = true;
+					$status = 'Active';
+				}
+				
+				if ($isPending) {
+					$pending[] = [
+						'filename' => $file,
+						'size' => bytesToKbOrMbOrGb($size),
+						'status' => $status,
+						'age' => $age
+					];
+				}
+			}
+			closedir($dir);
+		}
+		
+		// Sort by most recently modified first
+		usort($pending, fn($a, $b) => $a['age'] - $b['age']);
+		
+		// Format queue downloads for display
 		$formatted = [];
 		foreach ($downloads as $dl) {
 			$progress = 0;
@@ -104,7 +154,7 @@ switch ($_GET['ajax']) {
 		}
 		
 		header('Content-Type: application/json');
-		echo array_to_json(['downloads' => $formatted, 'stats' => $stats]);
+		echo array_to_json(['downloads' => $formatted, 'pending' => $pending, 'stats' => $stats]);
 		break;
 	
 	case 'queue_add':

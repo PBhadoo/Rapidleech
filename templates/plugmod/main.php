@@ -124,9 +124,9 @@ if (!defined('RAPIDLEECH')) {
             </button>
             <button id="navcell4" class="cell-nav" onclick="javascript:switchCell(4);">
                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -3px; margin-right: 6px;">
-                    <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9V9h4V5h2v4h4v2z"/>
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                 </svg>
-                Download Queue
+                Pending Downloads
             </button>
         </nav>
 
@@ -460,7 +460,7 @@ if (!defined('RAPIDLEECH')) {
             /* ]]> */
             </script>
 
-            <!-- Tab 4: Download Queue -->
+            <!-- Tab 4: Pending Downloads -->
             <div class="hide-table tab-content" id="tb4">
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
@@ -468,32 +468,25 @@ if (!defined('RAPIDLEECH')) {
                             <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -5px; margin-right: 8px;">
                                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                             </svg>
-                            Download Queue
+                            Pending Downloads
                         </h3>
                         <div id="queue-stats" style="font-size: 13px; color: var(--text-muted);">
                             Loading...
                         </div>
                     </div>
                     
-                    <!-- Add URL Form -->
-                    <div class="rl-card" style="margin-bottom: 20px; background: var(--bg-tertiary);">
-                        <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
-                            <div style="flex: 1; min-width: 250px;">
-                                <label class="rl-label">Add URL to Queue</label>
-                                <input type="text" id="queue-url" placeholder="https://example.com/file.zip" style="width: 100%; max-width: 100%;">
+                    <!-- Parallel Download Info -->
+                    <div class="rl-card" style="margin-bottom: 20px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); color: white; padding: 16px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M13 5v6h1.17L12 13.17 9.83 11H11V5h2m2-2H9v6H5l7 7 7-7h-4V3zm4 15H5v2h14v-2z"/>
+                            </svg>
+                            <div style="flex: 1;">
+                                <strong style="font-size: 14px;">IDM-Style Parallel Downloading</strong>
+                                <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">
+                                    8 chunks per file • Max 5 concurrent downloads • Auto-resume support
+                                </div>
                             </div>
-                            <button onclick="addToQueue();" class="rl-btn rl-btn-primary">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                                </svg>
-                                Add to Queue
-                            </button>
-                            <button onclick="processQueue();" class="rl-btn rl-btn-secondary">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M8 5v14l11-7z"/>
-                                </svg>
-                                Start Queue
-                            </button>
                         </div>
                     </div>
                     
@@ -519,9 +512,9 @@ if (!defined('RAPIDLEECH')) {
                         </span>
                     </div>
                     
-                    <!-- Queue List -->
+                    <!-- Pending Downloads List -->
                     <div id="queue-container" style="text-align: left;">
-                        <div class="queue-empty">Loading queue...</div>
+                        <div class="queue-empty">Loading...</div>
                     </div>
                 </div>
                 
@@ -676,26 +669,41 @@ if (!defined('RAPIDLEECH')) {
                 function renderQueue(data) {
                     // Update stats
                     var stats = data.stats || {};
-                    var statsHtml = '<span style="margin-right: 12px;"><strong>' + (stats.downloading || 0) + '</strong>/' + (stats.max_concurrent || 5) + ' active</span>';
+                    var pending = data.pending || [];
+                    var downloads = data.downloads || [];
+                    
+                    var totalActive = (stats.downloading || 0) + pending.length;
+                    var statsHtml = '<span style="margin-right: 12px;"><strong>' + totalActive + '</strong> active</span>';
                     statsHtml += '<span style="margin-right: 12px;"><strong>' + (stats.queued || 0) + '</strong> queued</span>';
                     statsHtml += '<span><strong>' + (stats.completed || 0) + '</strong> completed</span>';
                     $('#queue-stats').html(statsHtml);
                     
                     // Render downloads
                     var html = '';
-                    var downloads = data.downloads || [];
                     
-                    if (downloads.length === 0) {
+                    // First show pending file downloads (from filesystem)
+                    if (pending.length > 0) {
+                        html += '<div style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: var(--radius-md); border-left: 4px solid var(--accent-primary);">';
+                        html += '<strong style="color: var(--text-primary);">Active File Downloads</strong>';
+                        html += '<div style="margin-top: 10px;">';
+                        for (var p = 0; p < pending.length; p++) {
+                            var pf = pending[p];
+                            html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color);">';
+                            html += '<span style="word-break: break-all; flex: 1; margin-right: 12px;">' + escapeHtml(pf.filename) + '</span>';
+                            html += '<span style="color: var(--text-muted); white-space: nowrap;">' + pf.size + ' • ' + pf.status + '</span>';
+                            html += '</div>';
+                        }
+                        html += '</div></div>';
+                    }
+                    
+                    if (downloads.length === 0 && pending.length === 0) {
                         html = '<div class="queue-empty">';
                         html += '<svg width="64" height="64" fill="currentColor" viewBox="0 0 24 24" style="opacity: 0.3; margin-bottom: 16px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
-                        html += '<br><strong>Queue is empty</strong>';
-                        html += '<br><small>Add URLs above to start downloading</small>';
-                        html += '<div style="margin-top: 20px; font-size: 12px; color: var(--text-accent);">';
-                        html += '✓ Parallel downloads (8 chunks per file)<br>';
-                        html += '✓ Max 5 concurrent downloads<br>';
-                        html += '✓ Auto-resume support';
-                        html += '</div></div>';
-                    } else {
+                        html += '<br><strong>No Pending Downloads</strong>';
+                        html += '<br><small>Start a transload to see downloads here</small>';
+                        html += '</div>';
+                    } else if (downloads.length > 0) {
+                        html += '<div style="margin-top: 8px;"><strong style="color: var(--text-primary);">Parallel Queue Downloads</strong></div>';
                         for (var i = 0; i < downloads.length; i++) {
                             var dl = downloads[i];
                             html += '<div class="queue-item ' + dl.status + '">';
