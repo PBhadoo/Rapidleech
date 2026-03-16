@@ -24,7 +24,7 @@ $options = array (
   array (
     'transload' => 'transload',
   ),
-  'template_used' => 'plugmod',
+  'template_used' => 'flavor',
   'default_language' => 'en',
   'show_all' => true,
   'server_info' => true,

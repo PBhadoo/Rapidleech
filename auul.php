@@ -16,8 +16,6 @@ require_once(HOST_DIR.'download/hosts.php');
 require_once(CLASS_DIR.'http.php');
 include(TEMPLATE_DIR.'header.php');
 ?>
-<br />
-<center>
 <?php
 	// If the user submit to upload, go into upload page
 	if ($_GET['action'] == 'upload') {
@@ -118,16 +116,37 @@ include(TEMPLATE_DIR.'header.php');
 ?>
 /* ]]> */
 </script>
+
+<div class="rl-container">
+	<div class="rl-card">
+		<div class="rl-card-header">
+			<div class="rl-card-icon">
+				<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+				</svg>
+			</div>
+			<div>
+				<div class="rl-card-title"><?php echo lang(335); ?> - In Progress</div>
+				<div class="rl-card-subtitle">Uploading files to selected hosts</div>
+			</div>
+		</div>
+		
+		<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 16px;">
 <?php
 	for ($i=0;$i<=$openwin;$i++) {
-		if (( $i+1 )% 2) echo "<br />";
 ?>
-<iframe width="49%" height="300" src="" name="idownload<?php echo $i; ?>" id="idownload<?php echo $i; ?>" style="float:left; border:1px solid;"><?php echo lang(30); ?></iframe>
+			<iframe src="" name="idownload<?php echo $i; ?>" id="idownload<?php echo $i; ?>" style="width: 100%; height: 300px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-secondary);"><?php echo lang(30); ?></iframe>
 <?php
 	}
 ?>
-<script type="text/javascript">startauto();</script><br />
-<a href="files/myuploads.txt">myuploads.txt</a>
+		</div>
+		
+		<div style="margin-top: 20px; text-align: center;">
+			<a href="files/myuploads.txt" class="rl-btn rl-btn-secondary">View myuploads.txt</a>
+		</div>
+	</div>
+</div>
+<script type="text/javascript">startauto();</script>
 <?php
 
 	} else {
@@ -139,10 +158,26 @@ _create_list();
 require_once("classes/options.php");
 unset($Path);
 ?>
-<form name="flist" method="post" action="auul.php?action=upload">
-<p><b><?php echo lang(47); ?></b></p>
-<div style="overflow:auto; height:200px; width: 300px;">
-<table>
+
+<div class="rl-container">
+	<form name="flist" method="post" action="auul.php?action=upload">
+		<div class="rl-card" style="margin-bottom: 24px;">
+			<div class="rl-card-header">
+				<div class="rl-card-icon">
+					<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+						<path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+					</svg>
+				</div>
+				<div>
+					<div class="rl-card-title"><?php echo lang(335); ?></div>
+					<div class="rl-card-subtitle">Upload files to multiple hosts</div>
+				</div>
+			</div>
+			
+			<!-- Upload Hosts Selection -->
+			<div class="rl-form-group">
+				<label class="rl-label" style="margin-bottom: 12px;"><?php echo lang(47); ?></label>
+				<div class="plugin-list" style="max-height: 200px; overflow-y: auto; padding: 12px; background: var(--bg-tertiary); border-radius: var(--radius-md);">
 <?php
 	$d = opendir(HOST_DIR."upload/");
 	while (false !== ($modules = readdir($d)))
@@ -164,34 +199,62 @@ unset($Path);
 		foreach($upload_services as $upl)
 		{
 ?>
-	<tr>
-		<td><input type="checkbox" name="hosts[]" value="<?php echo $upl; ?>" /></td>
-		<td><?php echo str_replace("_"," ",$upl)." (".($max_file_size[$upl]==false ? "Unlim" : $max_file_size[$upl]."Mb").")"; ?></td>
-	</tr>
+					<label class="rl-checkbox" style="margin-bottom: 8px; padding: 8px 12px; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+						<input type="checkbox" name="hosts[]" value="<?php echo $upl; ?>" />
+						<span><?php echo str_replace("_"," ",$upl)." (".($max_file_size[$upl]==false ? "Unlim" : $max_file_size[$upl]."Mb").")"; ?></span>
+					</label>
 <?php
 		}
 	}
 ?>
-</table>
-</div><br />
-<hr /><br />
-<input type="submit" name="submit" value="Upload" /> <?php echo lang(49); ?>: <input type="text" size="2" name="windows" value="4" /><br />
-<?php echo lang(50); ?>: <input type="text" size="50" name="save_style" placeholder="{name}: {link} or {link}" /><br />
-<a href="javascript:setCheckboxes(1);" class="chkmenu"><?php echo lang(52); ?></a> |
-<a href="javascript:setCheckboxes(0);" class="chkmenu"><?php echo lang(53); ?></a> |
-<a href="javascript:setCheckboxes(2);" class="chkmenu"><?php echo lang(54); ?></a> |
-<a href="files/myuploads.txt" class="chkmenu">myuploads.txt</a>
-<div style="overflow:auto; height:400px; width: 700px;">
-<table cellpadding="3" cellspacing="1" width="100%" class="filelist" id="table_filelist_au">
+				</div>
+			</div>
+			<!-- Upload Settings -->
+			<div style="display: grid; gap: 16px; padding: 20px; background: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: 20px;">
+				<div class="rl-form-group" style="display: flex; align-items: center; gap: 12px; margin-bottom: 0;">
+					<label class="rl-label" style="margin-bottom: 0; white-space: nowrap;"><?php echo lang(49); ?>:</label>
+					<input type="text" name="windows" value="4" style="width: 60px; text-align: center;" />
+				</div>
+				<div class="rl-form-group" style="margin-bottom: 0;">
+					<label class="rl-label"><?php echo lang(50); ?>:</label>
+					<input type="text" name="save_style" placeholder="{name}: {link} or {link}" style="width: 100%;" />
+				</div>
+			</div>
+			
+			<!-- Action Buttons -->
+			<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 20px;">
+				<input type="submit" name="submit" value="<?php echo lang(335); ?>" class="rl-btn rl-btn-primary" />
+				<a href="javascript:setCheckboxes(1);" class="rl-btn rl-btn-secondary rl-btn-sm"><?php echo lang(52); ?></a>
+				<a href="javascript:setCheckboxes(0);" class="rl-btn rl-btn-secondary rl-btn-sm"><?php echo lang(53); ?></a>
+				<a href="javascript:setCheckboxes(2);" class="rl-btn rl-btn-secondary rl-btn-sm"><?php echo lang(54); ?></a>
+				<a href="files/myuploads.txt" class="rl-btn rl-btn-secondary rl-btn-sm">myuploads.txt</a>
+			</div>
+		</div>
+		<!-- Files Card -->
+		<div class="rl-card">
+			<div class="rl-card-header">
+				<div class="rl-card-icon" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);">
+					<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+						<path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+					</svg>
+				</div>
+				<div>
+					<div class="rl-card-title"><?php echo lang(55); ?></div>
+					<div class="rl-card-subtitle">Select files to upload</div>
+				</div>
+			</div>
+			
+			<div style="overflow-x: auto;">
+<table cellpadding="3" cellspacing="0" width="100%" class="filelist" id="table_filelist_au" style="border-radius: var(--radius-md); overflow: hidden;">
 	<tr class="flisttblhdr" valign="bottom">
-		<th class="sorttable_checkbox">&nbsp;</th>
+		<th class="sorttable_checkbox" style="width: 40px;">&nbsp;</th>
 		<th class="sorttable_alpha"><?php echo lang(55); ?></th>
-		<th><?php echo lang(56); ?></th>
+		<th style="width: 100px;"><?php echo lang(56); ?></th>
 	</tr>
 <?php
 if (!$list) {
 ?>
-	<center><?php echo lang(57); ?></center>
+	<tr><td colspan="3" style="text-align: center; padding: 40px; color: var(--text-muted);"><?php echo lang(57); ?></td></tr>
 <?php
 } else {
 ?>
@@ -199,8 +262,8 @@ if (!$list) {
 	foreach($list as $key => $file) {
 		if(file_exists($file["name"])) {
 ?>
-	<tr>
-		<td><input type="checkbox" name="files[]" value="<?php echo base64_encode(basename($file["name"])); ?>" /></td>
+	<tr class="flistmouseoff" onmouseover="this.className='flistmouseon'" onmouseout="this.className='flistmouseoff'">
+		<td style="text-align: center;"><input type="checkbox" name="files[]" value="<?php echo base64_encode(basename($file["name"])); ?>" /></td>
 		<td><?php echo basename($file["name"]); ?></td>
 		<td><?php echo $file["size"]; ?></td>
 	</tr>
@@ -209,25 +272,28 @@ if (!$list) {
 	}
 ?>
 </table>
+			</div>
 <?php
 	if ($options['flist_sort']) {
 		echo '<script type="text/javascript">sorttable.makeSortable(document.getElementById("table_filelist_au"));</script>';
 	}
 ?>
-<br />
-<?php echo lang(58); ?><br />
-<ol>
-	<li>{link} : <?php echo lang(59); ?></li>
-	<li>{name} : <?php echo lang(60); ?></li>
-	<li><?php echo lang(51); ?> : <?php echo lang(61); ?></li>
-</ol><br />
-<?php echo lang(62); ?>
+			
+			<!-- Save Style Legend -->
+			<div style="margin-top: 20px; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);">
+				<p style="color: var(--text-secondary); margin-bottom: 8px;"><strong><?php echo lang(58); ?></strong></p>
+				<ul style="margin: 0; padding-left: 20px; color: var(--text-muted);">
+					<li><code>{link}</code> : <?php echo lang(59); ?></li>
+					<li><code>{name}</code> : <?php echo lang(60); ?></li>
+					<li><?php echo lang(51); ?> : <?php echo lang(61); ?></li>
+				</ul>
+				<p style="color: var(--text-muted); margin-top: 12px;"><?php echo lang(62); ?></p>
+			</div>
+		</div>
+	</form>
 </div>
-</form>
 <?php
 }
 }
-
 ?>
-</center>
 <?php include(TEMPLATE_DIR.'footer.php'); ?>

@@ -8,14 +8,30 @@ class mega_co_nz extends DownloadClass {
 	private $useOpenSSL, $useOldFilter, $seqno, $cookie;
 	public function Download($link) {
 		$this->checkCryptDependences();
-		$this->checkBug78902($link);
+		$this->checkMegaQueue($link);
 
 		$this->seqno = mt_rand();
-		$this->changeMesg(lang(300).'<br />Mega.co.nz plugin by Th3-822'); // Please, do not remove or change this line contents. - Th3-822
+		$this->changeMesg(lang(300).'<br />Mega.nz plugin');
 
-		if (preg_match('@F!?([^!]{8})[!#]([\w\-\,]{22})(?:!([^!#]{8}))?(!less$)?@i', $link, $fid)) return $this->Folder($fid[1], $fid[2], (!empty($fid[3]) && $fid[3] != $fid[1] ? $fid[3] : 0), (empty($fid[4]) ? 1 : 0));
-		if (!preg_match('@(T8|N)?!?([^!]{8})[!#]([\w\-\,]{43})(?:(?:!|=###n=)([^!#]{8})(?:!|$))?@i', $link, $fid)) html_error('FileID or Key not found at link.');
+		// New format: mega.nz/folder/ID#KEY or mega.nz/folder/ID#KEY/subfolder/SUBID
+		if (preg_match('@mega\.(?:nz|co\.nz)/folder/([^#]{8})[#!]([\w\-\,]{22})(?:/folder/([^#]{8}))?(!less$)?@i', $link, $fid)) {
+			return $this->Folder($fid[1], $fid[2], (!empty($fid[3]) ? $fid[3] : 0), (empty($fid[4]) ? 1 : 0));
+		}
+		// Old format: mega.nz/#F!ID!KEY
+		if (preg_match('@[#!]F!?([^!]{8})[!#]([\w\-\,]{22})(?:!([^!#]{8}))?(!less$)?@i', $link, $fid)) {
+			return $this->Folder($fid[1], $fid[2], (!empty($fid[3]) && $fid[3] != $fid[1] ? $fid[3] : 0), (empty($fid[4]) ? 1 : 0));
+		}
 
+		// New format: mega.nz/file/ID#KEY
+		if (preg_match('@mega\.(?:nz|co\.nz)/file/([^#]{8})[#!]([\w\-\,]{43})@i', $link, $fid)) {
+			$fid = array($link, '', $fid[1], $fid[2]);
+		}
+		// Old format: mega.nz/#!ID!KEY or mega.nz/#N!ID!KEY
+		elseif (!preg_match('@(T8|N)?!?([^!]{8})[!#]([\w\-\,]{43})(?:(?:!|=###n=)([^!#]{8})(?:!|$))?@i', $link, $fid)) {
+			html_error('FileID or Key not found at link. Supported formats:<br>mega.nz/file/ID#KEY<br>mega.nz/folder/ID#KEY<br>mega.nz/#!ID!KEY');
+		}
+
+		// Load premium account credentials if available
 		$pA = (empty($_REQUEST['premium_user']) || empty($_REQUEST['premium_pass']) ? false : true);
 		if (!empty($_REQUEST['premium_acc']) && $_REQUEST['premium_acc'] == 'on' && ($pA || (!empty($GLOBALS['premium_acc']['mega_co_nz']['user']) && !empty($GLOBALS['premium_acc']['mega_co_nz']['pass'])))) {
 			$user = ($pA ? $_REQUEST['premium_user'] : $GLOBALS['premium_acc']['mega_co_nz']['user']);
@@ -26,17 +42,30 @@ class mega_co_nz extends DownloadClass {
 				unset($_POST['pA_encrypted']);
 			}
 		}
+		// Also check server-side accounts even without premium_acc checkbox
+		if (empty($user) && !empty($GLOBALS['premium_acc']['mega_co_nz']['user']) && !empty($GLOBALS['premium_acc']['mega_co_nz']['pass'])) {
+			$user = $GLOBALS['premium_acc']['mega_co_nz']['user'];
+			$pass = $GLOBALS['premium_acc']['mega_co_nz']['pass'];
+		}
 
-		do {
-			$reply = $this->apiReq(array('a' => 'g', 'g' => 1, (empty($fid[1]) ? 'p' : 'n') => $fid[2], 'ssl' => 0), (!empty($fid[1]) && !empty($fid[4]) ? $fid[4] : ''));
-			if (is_numeric($reply[0])) $this->CheckErr($reply[0]);
-			if (!empty($reply[0]['e']) && is_numeric($reply[0]['e'])) $this->CheckErr($reply[0]['e']);
-			$tLimit = $this->checkTrafficLimit($reply[0]['g']);
-		} while (!empty($user) && !empty($pass) && empty($this->cookie['sid']) && $tLimit && $this->cJar_load($user, $pass));
+		// If we have credentials, login FIRST before requesting download link
+		if (!empty($user) && !empty($pass) && empty($this->cookie['sid'])) {
+			$this->cJar_load($user, $pass);
+		}
+
+		$reply = $this->apiReq(array('a' => 'g', 'g' => 1, (empty($fid[1]) ? 'p' : 'n') => $fid[2], 'ssl' => 0), (!empty($fid[1]) && !empty($fid[4]) ? $fid[4] : ''));
+		if (is_numeric($reply[0])) $this->CheckErr($reply[0]);
+		if (!empty($reply[0]['e']) && is_numeric($reply[0]['e'])) $this->CheckErr($reply[0]['e']);
+		$tLimit = $this->checkTrafficLimit($reply[0]['g']);
 
 		if ($tLimit) {
-			if (empty($this->cookie['sid'])) html_error('Anonymous Traffic Limit Reached, add an account then try again.');
-			else html_error('Traffic Limit Reached.');
+			$debugInfo = '';
+			if (!empty($user)) $debugInfo .= '<br>Account: ' . htmlspecialchars(substr($user, 0, 3)) . '***';
+			if (!empty($this->cookie['sid'])) $debugInfo .= '<br>Session: Active (logged in)';
+			else $debugInfo .= '<br>Session: None (not logged in)';
+			if (!extension_loaded('bcmath')) $debugInfo .= '<br>Warning: bcmath extension not loaded (required for Mega login)';
+			if (empty($this->cookie['sid'])) html_error('Transfer Quota Exceeded (Anonymous).<br>To bypass: configure a Mega account in configs/accounts.php and check "Use Premium Account" in Settings tab.' . $debugInfo);
+			else html_error('Transfer Quota Exceeded even with Premium account. Your Mega plan quota may be used up.' . $debugInfo);
 		}
 
 		$key = $this->base64_to_a32($fid[3]);
@@ -64,6 +93,109 @@ class mega_co_nz extends DownloadClass {
 			echo "\t<div><br /><input type='submit' value='Continue' /></div></form>\n";
 			include(TEMPLATE_DIR.'footer.php');
 			exit();
+		}
+	}
+
+	// ============================================
+	// MEGA DOWNLOAD QUEUE: Only 1 Mega download at a time
+	// Uses a lock file to prevent concurrent downloads
+	// ============================================
+	private function checkMegaQueue($link) {
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		$maxWait = 600; // Max 10 minutes wait
+		$staleTimeout = 300; // Consider lock stale after 5 minutes of no update
+
+		// If no lock exists, we're first - create it and proceed
+		if (!file_exists($lockFile)) {
+			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
+			// Register cleanup on shutdown
+			register_shutdown_function(array($this, 'releaseMegaLock'));
+			return;
+		}
+
+		// Lock exists - check if it's stale
+		$lockData = @json_decode(@file_get_contents($lockFile), true);
+		if (!$lockData || (time() - $lockData['time']) > $staleTimeout) {
+			// Stale lock - remove and take over
+			@unlink($lockFile);
+			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
+			register_shutdown_function(array($this, 'releaseMegaLock'));
+			return;
+		}
+
+		// Another download is active - show queue page with auto-retry
+		$waited = 0;
+		$retryInterval = 5; // Check every 5 seconds
+		$form = $this->DefaultParamArr($link);
+
+		echo '<div style="text-align:center; padding:20px;">';
+		echo '<h3 style="color:var(--fl-accent,#6366f1);">⏳ Mega Download Queue</h3>';
+		echo '<p>Another Mega download is currently in progress.</p>';
+		echo '<p>Your download will start automatically when the current one finishes.</p>';
+		echo '<p style="font-size:13px; color:var(--fl-text-3,#888);">Currently downloading: <b>' . htmlspecialchars($lockData['link'] ?? 'unknown') . '...</b></p>';
+		echo '<div id="mega_queue_status" style="margin:20px 0; padding:15px; background:var(--fl-surface-alt,#1e2231); border-radius:12px;">';
+		echo '<span id="mega_queue_msg">Waiting in queue... Checking every ' . $retryInterval . ' seconds.</span>';
+		echo '</div>';
+		echo '</div>';
+
+		echo "\n<form name='mega_queue_form' action='{$_SERVER['SCRIPT_NAME']}' method='POST' style='display:none;'>\n";
+		foreach ($form as $name => $input) echo "<input type='hidden' name='$name' value='" . htmlspecialchars($input, ENT_QUOTES) . "' />\n";
+		echo "</form>\n";
+
+		echo "<script type='text/javascript'>
+		var mqRetries = 0;
+		var mqMax = " . intval($maxWait / $retryInterval) . ";
+		function mqCheck() {
+			mqRetries++;
+			document.getElementById('mega_queue_msg').innerHTML = 'Waiting in queue... Attempt ' + mqRetries + '/' + mqMax + ' (auto-retry in {$retryInterval}s)';
+			if (mqRetries >= mqMax) {
+				document.getElementById('mega_queue_msg').innerHTML = 'Queue timeout. <a href=\"javascript:document.mega_queue_form.submit();\">Click to retry</a>';
+				return;
+			}
+			// Use AJAX to check if lock is released
+			var xhr = new XMLHttpRequest();
+			xhr.open('GET', 'ajax.php?ajax=mega_queue_check&t=' + Date.now(), true);
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState == 4 && xhr.status == 200) {
+					if (xhr.responseText.indexOf('free') !== -1) {
+						document.getElementById('mega_queue_msg').innerHTML = '<b>Queue is free! Starting download...</b>';
+						document.mega_queue_form.submit();
+					} else {
+						setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
+					}
+				} else if (xhr.readyState == 4) {
+					setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
+				}
+			};
+			xhr.send();
+		}
+		setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
+		</script>";
+
+		include(TEMPLATE_DIR.'footer.php');
+		exit();
+	}
+
+	public function releaseMegaLock() {
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		if (file_exists($lockFile)) {
+			$lockData = @json_decode(@file_get_contents($lockFile), true);
+			// Only remove if it's our lock
+			if (!$lockData || $lockData['pid'] == getmypid()) {
+				@unlink($lockFile);
+			}
+		}
+	}
+
+	// Keep the lock file timestamp fresh during download
+	public function touchMegaLock() {
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		if (file_exists($lockFile)) {
+			$lockData = @json_decode(@file_get_contents($lockFile), true);
+			if ($lockData && $lockData['pid'] == getmypid()) {
+				$lockData['time'] = time();
+				@file_put_contents($lockFile, json_encode($lockData), LOCK_EX);
+			}
 		}
 	}
 
@@ -407,10 +539,10 @@ class mega_co_nz extends DownloadClass {
 				if (!extension_loaded('bcmath')) html_error('This plugin needs BCMath extension for re-login.');
 				$this->cookie['sid'] = $cookie['sid'] = false; // Do not send old sid or it will get '-15' error.
 				$res = $this->apiReq(array('a' => 'us', 'user' => $user, 'uh' => $cookie['user_handle']));
-				if (is_numeric($res[0])) $this->CheckEr($res[0], 'Cannot re-login');
+				if (is_numeric($res[0])) $this->CheckErr($res[0], 'Cannot re-login');
 				$rsa_priv_key = explode('/T8\\', $cookie['rsa_priv_key']);
 				$cookie['sid'] = $this->base64url_encode(substr(strrev($this->rsa_decrypt($this->mpi2bc($this->base64url_decode($res[0]['csid'])), $rsa_priv_key[0], $rsa_priv_key[1], $rsa_priv_key[2])), 0, 43));
-			} else $this->CheckEr($quota[0], 'Cannot validate saved-login');
+		} else $this->CheckErr($quota[0], 'Cannot validate saved-login');
 		}
 		$this->cookie = $cookie;
 		$this->cJar_save($user, $pass); // Update last used time.
@@ -434,10 +566,26 @@ class mega_co_nz extends DownloadClass {
 	private function Login($user, $pass) {
 		if (!extension_loaded('bcmath')) html_error('This plugin needs BCMath extension for login.');
 		$this->cookie = array();
-		$password_aes = $this->prepare_key($this->str_to_a32($pass));
-		$this->cookie['user_handle'] = $this->stringhash($user, $password_aes);
+
+		// Check account version (v1 uses stringhash, v2 uses PBKDF2)
+		$prelogin = $this->apiReq(array('a' => 'us0', 'user' => $user));
+		$accountVersion = (!is_numeric($prelogin[0]) && !empty($prelogin[0]['v'])) ? intval($prelogin[0]['v']) : 1;
+
+		if ($accountVersion >= 2 && !empty($prelogin[0]['s'])) {
+			// V2 login: PBKDF2 key derivation
+			$salt = $this->base64url_decode($prelogin[0]['s']);
+			// Derive 32 bytes using PBKDF2-SHA512 with 100000 iterations
+			$derivedKey = hash_pbkdf2('sha512', $pass, $salt, 100000, 32, true);
+			$password_aes = $this->str_to_a32(substr($derivedKey, 0, 16));
+			$this->cookie['user_handle'] = $this->base64url_encode(substr($derivedKey, 16, 16));
+		} else {
+			// V1 login: legacy stringhash method
+			$password_aes = $this->prepare_key($this->str_to_a32($pass));
+			$this->cookie['user_handle'] = $this->stringhash($user, $password_aes);
+		}
+
 		$res = $this->apiReq(array('a' => 'us', 'user' => $user, 'uh' => $this->cookie['user_handle']));
-		if (is_numeric($res[0])) $this->CheckEr($res[0], 'Cannot login');
+		if (is_numeric($res[0])) $this->CheckErr($res[0], 'Cannot login');
 		$master_key = $this->decrypt_key($this->base64_to_a32($res[0]['k']), $password_aes);
 		$privk = $this->a32_to_str($this->decrypt_key($this->base64_to_a32($res[0]['privk']), $master_key));
 		$rsa_priv_key = array(0, 0, 0, 0);

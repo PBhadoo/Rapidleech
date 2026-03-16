@@ -12,8 +12,6 @@ login_check();
 
 require(TEMPLATE_DIR . '/header.php');
 ?>
-<br />
-<center>
 <?php
 if (isset($_REQUEST['GO']) && $_REQUEST['GO'] == 'GO') {
 	$_REQUEST['links'] = (isset($_REQUEST['links'])) ? trim($_REQUEST['links']) : '';
@@ -26,15 +24,33 @@ if (isset($_REQUEST['GO']) && $_REQUEST['GO'] == 'GO') {
 		require_once(CLASS_DIR . 'ftp.php');
 		require_once(CLASS_DIR . 'http.php');
 ?>
-<table class="container" cellspacing="1">
-	<tr>
-		<td width="80%" align="center"><b><?php echo lang(21); ?></b></td>
-		<td width="70" align="center"><b><?php echo lang(22); ?></b></td>
-	</tr>
+<div class="rl-container">
+	<div class="rl-card">
+		<div class="rl-card-header">
+			<div class="rl-card-icon">
+				<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+				</svg>
+			</div>
+			<div>
+				<div class="rl-card-title"><?php echo lang(334); ?> - Server Side</div>
+				<div class="rl-card-subtitle">Processing downloads on server</div>
+			</div>
+		</div>
+		
+		<div style="overflow-x: auto;">
+			<table class="filelist" style="width: 100%; border-radius: var(--radius-md); overflow: hidden;">
+				<tr class="flisttblhdr">
+					<th style="text-align: left;"><?php echo lang(21); ?></th>
+					<th style="width: 120px; text-align: center;"><?php echo lang(22); ?></th>
+				</tr>
 <?php
-		for ($i = 0; $i < count($getlinks); $i++) echo "\t<tr><td width='80%' nowrap='nowrap'>".htmlentities($getlinks[$i])."</td><td width='70' id='status$i'>".lang(23)."</td></tr>$nn";
+		for ($i = 0; $i < count($getlinks); $i++) echo "\t\t\t<tr class='flistmouseoff'><td style='word-break: break-all;'>".htmlentities($getlinks[$i])."</td><td id='status$i' style='text-align: center;'>".lang(23)."</td></tr>$nn";
 ?>
-</table>
+			</table>
+		</div>
+	</div>
+</div>
 <script type="text/javascript">
 /* <![CDATA[ */
 function updateStatus(id, status) {
@@ -278,25 +294,49 @@ function resetProgress() {
 /* ]]> */
 </script>
 
-<table id="links" class="container" cellspacing="1">
-	<thead>
-		<tr><td width="80%" align="left"><b><?php echo lang(21); ?></b></td><td width="70" align="left"><b><?php echo lang(22); ?></b></td></tr>
-	</thead><tfoot>
-		<tr id="auto"><td colspan="2" align="center"><input type="button" value="<?php echo lang(29); ?>" onclick="javascript:startauto();" /></td></tr>
-	</tfoot><tbody>
-<?php for ($i = 0; $i < count($getlinks); $i++) echo "\t<tr><td nowrap='nowrap'>".htmlentities($getlinks[$i])."</td><td id='status$i'>" . lang(307) . "</td></tr>\r\n"; ?>
-	</tbody>
-</table>
-<br />
-<iframe width="90%" height="300" src="" name="idownload"><?php echo lang(30); ?></iframe>
-<br />
-<table class="container" cellspacing="1">
-	<tr>
-		<td><textarea name="addlinks" id="addlinks" cols="100" rows="5"></textarea></td>
-		<td><input type="button" value="<?php echo lang(31); ?>" onclick="javascript:addLinks();" /></td>
-	</tr>
-</table>
-</center>
+<div class="rl-container">
+	<div class="rl-card">
+		<div class="rl-card-header">
+			<div class="rl-card-icon">
+				<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+				</svg>
+			</div>
+			<div>
+				<div class="rl-card-title"><?php echo lang(334); ?> - Queue</div>
+				<div class="rl-card-subtitle">Processing download links</div>
+			</div>
+		</div>
+		
+		<div style="overflow-x: auto; margin-bottom: 20px;">
+			<table id="links" class="filelist" style="width: 100%; border-radius: var(--radius-md); overflow: hidden;">
+				<thead>
+					<tr class="flisttblhdr">
+						<th style="text-align: left;"><?php echo lang(21); ?></th>
+						<th style="width: 120px; text-align: center;"><?php echo lang(22); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+<?php for ($i = 0; $i < count($getlinks); $i++) echo "\t\t\t\t<tr class='flistmouseoff'><td style='word-break: break-all;'>".htmlentities($getlinks[$i])."</td><td id='status$i' style='text-align: center;'>" . lang(307) . "</td></tr>\r\n"; ?>
+				</tbody>
+				<tfoot>
+					<tr id="auto"><td colspan="2" style="text-align: center; padding: 16px;"><input type="button" value="<?php echo lang(29); ?>" onclick="javascript:startauto();" class="rl-btn rl-btn-primary" /></td></tr>
+				</tfoot>
+			</table>
+		</div>
+		
+		<iframe src="" name="idownload" style="width: 100%; height: 300px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-secondary); margin-bottom: 20px;"><?php echo lang(30); ?></iframe>
+		
+		<!-- Add More Links -->
+		<div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);">
+			<label class="rl-label" style="margin-bottom: 8px;"><?php echo lang(31); ?></label>
+			<div style="display: flex; gap: 12px; align-items: flex-end;">
+				<textarea name="addlinks" id="addlinks" rows="3" placeholder="Paste additional links here..." style="flex: 1; resize: vertical;"></textarea>
+				<input type="button" value="<?php echo lang(31); ?>" onclick="javascript:addLinks();" class="rl-btn rl-btn-secondary" />
+			</div>
+		</div>
+	</div>
+</div>
 <?php
 		include(TEMPLATE_DIR.'footer.php');
 		exit;
@@ -309,78 +349,131 @@ function resetProgress() {
 		document.getElementById('listing').style.display = 'none';
 		document.getElementById('options').style.display = 'none';
 		document.getElementById(page).style.display = 'block';
+		
+		// Update tab active states
+		document.querySelectorAll('.rl-tab').forEach(function(tab) {
+			tab.classList.remove('active');
+		});
+		event.target.classList.add('active');
 	}
 
 	function HideAll() {
 		document.getElementById('entered').style.display = 'none';
-		/* document.getElementById('worked_frame').style.display = 'block'; */
 	}
 /* ]]> */
 </script>
-<table class="container" cellspacing="0" cellpadding="1" id="entered">
-	<tr><td>
-		<form action="?GO=GO" method="post" >
-		<table align="center" width="700" border="0">
-			<tr id="menu"><td width="700" align="center"><a href="javascript:ViewPage('listing');"><?php echo lang(32); ?></a>&nbsp;|&nbsp;<a href="javascript:ViewPage('options');"><?php echo lang(33); ?></a></td></tr>
-			<tr><td width="100%" valign="top">
+
+<div class="rl-container" id="entered">
+	<div class="rl-card">
+		<div class="rl-card-header">
+			<div class="rl-card-icon">
+				<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+				</svg>
+			</div>
+			<div>
+				<div class="rl-card-title"><?php echo lang(334); ?></div>
+				<div class="rl-card-subtitle">Download multiple links automatically</div>
+			</div>
+		</div>
+		
+		<form action="?GO=GO" method="post">
+			<!-- Tabs Navigation -->
+			<div class="rl-tabs">
+				<button type="button" class="rl-tab active" onclick="ViewPage('listing');"><?php echo lang(32); ?></button>
+				<button type="button" class="rl-tab" onclick="ViewPage('options');"><?php echo lang(33); ?></button>
+			</div>
+			
+			<div style="width: 100%;">
 				<div id="listing" style="display:block;">
-					<table border="0" style="width:710px;">
-						<tr><td align="center"><textarea id="links" name="links" rows="25" cols="100" style="width:600px;height:400px;border:1px solid #002E43;"></textarea></td></tr>
-						<tr><td align="center" valign="top"><input type="submit" value="<?php echo lang(34); ?>" onclick="javascript:HideAll();" style="width:100px;" /></td></tr>
-					</table>
+					<div class="rl-form-group">
+						<label class="rl-label"><?php echo lang(21); ?></label>
+						<textarea id="links" name="links" rows="15" placeholder="Paste your download links here, one per line..." style="width:100%; min-height:350px; resize:vertical;"></textarea>
+					</div>
+					<div style="text-align: center; margin-top: 20px;">
+						<input type="submit" value="<?php echo lang(34); ?>" onclick="javascript:HideAll();" class="rl-btn rl-btn-primary" />
+					</div>
 				</div>
 				<div id="options" style="display:none;">
-					<table cellspacing="5" style="width:710px;">
-						<tbody>
-							<tr><td align="center">
-								<table align="center">
-									<tr>
-										<td><input type="checkbox" id="useproxy" name="useproxy" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('proxy').style.display=displ;"<?php echo !empty($_COOKIE['useproxy']) ? ' checked="checked"' : ''; ?> />&nbsp;<?php echo lang(35); ?></td>
-										<td>&nbsp;</td>
-										<td id="proxy"<?php echo !empty($_COOKIE['useproxy']) ? '' : ' style="display: none;"'; ?>>
-											<table border="0">
-												<tr><td><?php echo lang(36); ?>:</td><td><input name="proxy" size="25"<?php echo !empty($_COOKIE['roxy']) ? ' value="'.htmlspecialchars($_COOKIE['proxy'], ENT_QUOTES).'"' : ''; ?> /></td></tr>
-												<tr><td><?php echo lang(37); ?>:</td><td><input name="proxyuser" size="25"<?php echo !empty($_COOKIE['proxyuser']) ? ' value="'.htmlspecialchars($_COOKIE['proxyuser'], ENT_QUOTES).'"' : ''; ?> /></td></tr>
-												<tr><td><?php echo lang(38); ?>:</td><td><input name="proxypass" size="25"<?php echo !empty($_COOKIE['proxypass']) ? ' value="'.htmlspecialchars($_COOKIE['proxypass'], ENT_QUOTES).'"' : ''; ?> /></td></tr>
-											</table>
-										</td>
-									</tr>
+					<div style="display: grid; gap: 20px;">
+						<!-- Proxy Settings -->
+						<div class="rl-form-group">
+							<label class="rl-checkbox">
+								<input type="checkbox" id="useproxy" name="useproxy" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('proxy').style.display=displ;"<?php echo !empty($_COOKIE['useproxy']) ? ' checked="checked"' : ''; ?> />
+								<span><?php echo lang(35); ?></span>
+							</label>
+							<div id="proxy" style="margin-top: 12px; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);<?php echo !empty($_COOKIE['useproxy']) ? '' : ' display: none;'; ?>">
+								<div class="rl-form-group" style="margin-bottom: 12px;">
+									<label class="rl-label"><?php echo lang(36); ?>:</label>
+									<input type="text" name="proxy" placeholder="host:port"<?php echo !empty($_COOKIE['proxy']) ? ' value="'.htmlspecialchars($_COOKIE['proxy'], ENT_QUOTES).'"' : ''; ?> />
+								</div>
+								<div class="rl-form-group" style="margin-bottom: 12px;">
+									<label class="rl-label"><?php echo lang(37); ?>:</label>
+									<input type="text" name="proxyuser"<?php echo !empty($_COOKIE['proxyuser']) ? ' value="'.htmlspecialchars($_COOKIE['proxyuser'], ENT_QUOTES).'"' : ''; ?> />
+								</div>
+								<div class="rl-form-group" style="margin-bottom: 0;">
+									<label class="rl-label"><?php echo lang(38); ?>:</label>
+									<input type="password" name="proxypass"<?php echo !empty($_COOKIE['proxypass']) ? ' value="'.htmlspecialchars($_COOKIE['proxypass'], ENT_QUOTES).'"' : ''; ?> />
+								</div>
+							</div>
+						</div>
 <?php if ($options['download_dir_is_changeable']) { ?>
-									<tr>
-										<td><input type="checkbox" name="saveto" id="saveto" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('path').style.display=displ;"<?php echo !empty($_COOKIE['saveto']) ? ' checked="checked"' : ''; ?> />&nbsp;<?php echo lang(40); ?></td>
-										<td>&nbsp;</td>
-										<td id="path" <?php echo !empty($_COOKIE['saveto']) ? '' : ' style="display: none;"'; ?>><?php echo lang(41); ?>:&nbsp;<input name="savedir" size="30" value="<?php echo (!empty($_COOKIE['savedir']) ? $_COOKIE['savedir'] : (substr($options['download_dir'], 0, 6) != 'ftp://' ? realpath(DOWNLOAD_DIR) : $options['download_dir'])); ?>" /></td>
-									</tr>
+						<!-- Save Directory -->
+						<div class="rl-form-group">
+							<label class="rl-checkbox">
+								<input type="checkbox" name="saveto" id="saveto" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('path').style.display=displ;"<?php echo !empty($_COOKIE['saveto']) ? ' checked="checked"' : ''; ?> />
+								<span><?php echo lang(40); ?></span>
+							</label>
+							<div id="path" style="margin-top: 12px; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);<?php echo !empty($_COOKIE['saveto']) ? '' : ' display: none;'; ?>">
+								<label class="rl-label"><?php echo lang(41); ?>:</label>
+								<input type="text" name="savedir" style="width: 100%;" value="<?php echo (!empty($_COOKIE['savedir']) ? $_COOKIE['savedir'] : (substr($options['download_dir'], 0, 6) != 'ftp://' ? realpath(DOWNLOAD_DIR) : $options['download_dir'])); ?>" />
+							</div>
+						</div>
 <?php } ?>
-									<tr>
-										<td><input type="checkbox" value="on" name="premium_acc" id="premium_acc" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('premiumblock').style.display=displ;"<?php if (count($premium_acc) > 0) echo ' checked="checked"'; ?> />&nbsp;<?php echo lang(42); ?></td>
-										<td>&nbsp;</td>
-										<td id="premiumblock" style="display: none;">
-											<table width="150" border="0">
-												<tr><td><?php echo lang(37); ?>:&nbsp;</td><td><input type="text" name="premium_user" id="premium_user" size="15" value="" /></td></tr>
-												<tr><td><?php echo lang(38); ?>:&nbsp;</td><td><input type="password" name="premium_pass" id="premium_pass" size="15" value="" /></td></tr>
-											</table>
-										</td>
-									</tr>
-									<tr>
-										<td><input type="checkbox" name="cookieuse" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('cookieblock').style.display=displ;" />&nbsp;<?php echo lang(235); ?></td>
-										<td>&nbsp;</td>
-										<td id="cookieblock" style="display: none;">
-											<table width="150" border="0">
-												<tr><td><?php echo lang(236); ?>;</td><td><input type="text" name="cookie" id="cookie" size="25" value="" /></td></tr>
-											</table>
-										</td>
-									</tr>
-									<tr>
-										<td>
-											<label><input type="checkbox" name="ytube_mp4" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('ytubeopt').style.display=displ;" checked="checked" />&nbsp;<?php echo lang(206); ?></label>
-											<table width="150" border="0" id="ytubeopt" style="display: none;">
-												<tr>
-													<td>&nbsp;<label><input type="checkbox" name="cleanname" checked="checked" value="1" /><small>&nbsp;Remove non-supported characters from filename</small></label></td>
-												</tr>
-												<tr>
-													<td>
-														<select name="yt_fmt" id="yt_fmt">
+						<!-- Premium Account -->
+						<div class="rl-form-group">
+							<label class="rl-checkbox">
+								<input type="checkbox" value="on" name="premium_acc" id="premium_acc" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('premiumblock').style.display=displ;"<?php if (count($premium_acc) > 0) echo ' checked="checked"'; ?> />
+								<span><?php echo lang(42); ?></span>
+							</label>
+							<div id="premiumblock" style="margin-top: 12px; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); display: none;">
+								<div class="rl-form-group" style="margin-bottom: 12px;">
+									<label class="rl-label"><?php echo lang(37); ?>:</label>
+									<input type="text" name="premium_user" id="premium_user" />
+								</div>
+								<div class="rl-form-group" style="margin-bottom: 0;">
+									<label class="rl-label"><?php echo lang(38); ?>:</label>
+									<input type="password" name="premium_pass" id="premium_pass" />
+								</div>
+							</div>
+						</div>
+						<!-- Cookie Settings -->
+						<div class="rl-form-group">
+							<label class="rl-checkbox">
+								<input type="checkbox" name="cookieuse" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('cookieblock').style.display=displ;" />
+								<span><?php echo lang(235); ?></span>
+							</label>
+							<div id="cookieblock" style="margin-top: 12px; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); display: none;">
+								<label class="rl-label"><?php echo lang(236); ?>:</label>
+								<input type="text" name="cookie" id="cookie" style="width: 100%;" />
+							</div>
+						</div>
+						<!-- YouTube Options -->
+						<div class="rl-form-group">
+							<label class="rl-checkbox">
+								<input type="checkbox" name="ytube_mp4" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('ytubeopt').style.display=displ;" checked="checked" />
+								<span><?php echo lang(206); ?></span>
+							</label>
+							<div id="ytubeopt" style="margin-top: 12px; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); display: none;">
+								<div class="rl-form-group" style="margin-bottom: 12px;">
+									<label class="rl-checkbox">
+										<input type="checkbox" name="cleanname" checked="checked" value="1" />
+										<span>Remove non-supported characters from filename</span>
+									</label>
+								</div>
+								<div class="rl-form-group" style="margin-bottom: 0;">
+									<label class="rl-label">Video Quality:</label>
+									<select name="yt_fmt" id="yt_fmt" style="width: 100%;">
 															<option value="highest" selected="selected"><?php echo lang(219); ?></option>
 															<option value='22'>[22] Video: MP4 720p | Audio: AAC ~192 Kbps</option>
 															<option value='43'>[43] Video: WebM 360p | Audio: Vorbis ~128 Kbps</option>
@@ -407,27 +500,32 @@ function resetProgress() {
 															<option value='251'>[251] Audio only: Opus @ ~128 Kbps</option>
 															<option value='250'>[250] Audio only: Opus @ ~64 Kbps</option>
 															<option value='249'>[249] Audio only: Opus @ ~48 Kbps</option>
-														</select>
-													</td>
-												</tr>
-											</table>
-										</td>
-									</tr>
-									<tr><td><label><input type="checkbox" name="server_side" value="on" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('serverside').style.display=displ;" />&nbsp;<?php echo lang(43); ?></label></td></tr>
-									<tr id="serverside" style="display: none;">
-										<td><input type="checkbox" name="server_dodelay" value="on" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('serverdelay').style.display=displ;" /><?php echo lang(44); ?></td>
-										<td>&nbsp;</td>
-										<td id="serverdelay" style="display: none;"><?php echo lang(45); ?>: <input type="text" name="serversidedelay" /></td>
-									</tr>
-								</table>
-							</td></tr>
-						</tbody>
-					</table>
+										</select>
+								</div>
+							</div>
+						</div>
+
+						<!-- Server-Side Download -->
+						<div class="rl-form-group">
+							<label class="rl-checkbox">
+								<input type="checkbox" name="server_side" value="on" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('serverside').style.display=displ;" />
+								<span><?php echo lang(43); ?></span>
+							</label>
+							<div id="serverside" style="margin-top: 12px; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); display: none;">
+								<label class="rl-checkbox">
+									<input type="checkbox" name="server_dodelay" value="on" onclick="javascript:var displ=this.checked?'':'none';document.getElementById('serverdelay').style.display=displ;" />
+									<span><?php echo lang(44); ?></span>
+								</label>
+								<div id="serverdelay" style="margin-top: 12px; display: none;">
+									<label class="rl-label"><?php echo lang(45); ?>:</label>
+									<input type="text" name="serversidedelay" placeholder="Seconds" />
+								</div>
+							</div>
+						</div>
+					</div>
 				</div>
-			</td></tr>
-		</table>
+			</div>
 		</form>
-	</td></tr>
-</table>
-</center>
+	</div>
+</div>
 <?php include(TEMPLATE_DIR.'footer.php'); ?>

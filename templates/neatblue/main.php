@@ -85,7 +85,7 @@ if (!$options['notes_disable']) {
 <td id="navcell1" class="cell-nav" onclick="javascript:switchCell(1);"><?php echo lang(329); ?></td>
 <td id="navcell2" class="cell-nav" onclick="javascript:switchCell(2);"><?php echo lang(330); ?></td>
 <td id="navcell3" class="cell-nav" onclick="javascript:switchCell(3);"><?php echo lang(331); ?></td>
-<td id="navcell4" class="cell-nav" onclick="javascript:switchCell(4);"><?php echo lang(332); ?></td>
+<td id="navcell4" class="cell-nav" onclick="javascript:switchCell(4);">Pending Downloads</td>
 </tr>
 </tbody>
 </table>
@@ -358,48 +358,116 @@ $(document).ready(function() {
 });
 /* ]]> */
 </script>
-<!--Start Lix Checker-->
+<!--Start Pending Downloads-->
 <table class="hide-table" id="tb4" cellspacing="5" width="100%">
 <tbody>
 <tr>
 <td align="center" width="100%">
 <div style="text-align:center">
-<div align="center"><b><?php echo lang(267); ?></b></div>
-<?php
-// Print out workable sites for link checker
-$name = array_keys($sites);
-sort($name);
-$workswith = implode(' | ', $name);
-?>
-<div class="workswith"><?php echo $workswith; ?>
-<br /><b><?php echo lang(268); ?></b><br />
-Anonym.to | Linkbucks.com | Lix.in<br />
-Rapidshare.com Folders | Usercash.com</div><br />
-<div align="center">
-<form action="ajax.php?ajax=linkcheck" method="post" id="linkchecker" onsubmit="return startLinkCheck();">
-<textarea rows="10" cols="87" name="links" id="links"></textarea><br /><br />
-<div style="text-align:center; margin:0 auto; width:450px;"><a href="<?php echo $PHP_SELF.'?debug=1' ?>" style="color:#3B5A6F"><b><?php echo lang(269); ?></b></a></div><br />
-<?php echo lang(270); ?>: <input type="checkbox" value="1" name="d" id="chk_d" />
-<?php echo lang(271); ?>: <input type="checkbox" value="1" name="k" id="chk_k" /><br /><br />
-<input type="submit" id="submit" value="<?php echo lang(272); ?>" name="submit" />
-</form>
+<div align="center"><b>Pending Downloads</b></div>
+<p style="color:#888; font-size:12px;">Downloads running in background (when page was closed)</p>
+<div id="pending-downloads-container" style="min-height: 100px; padding: 20px;">
+	<div id="pending-downloads-loading" style="display:none;">
+		<img alt="Loading..." src="templates/neatblue/images/ajax-loading.gif" /> Loading...
+	</div>
+	<div id="pending-downloads-empty" style="display:none; color:#666; padding:20px;">
+		No pending downloads at the moment.
+	</div>
+	<table id="pending-downloads-table" class="filelist" cellpadding="5" cellspacing="1" width="100%" style="display:none;">
+		<thead>
+			<tr class="flisttblhdr">
+				<td><b>Filename</b></td>
+				<td><b>Progress</b></td>
+				<td><b>Downloaded</b></td>
+				<td><b>Total</b></td>
+				<td><b>Elapsed</b></td>
+			</tr>
+		</thead>
+		<tbody id="pending-downloads-body">
+		</tbody>
+	</table>
 </div>
-<p style="text-align:center; font-size:11px">
-<small>Lix Checker v3.0.0 | Copyright Dman - MaxW.org | Optimized by zpikdum and sarkar<br />
-<b>Mod by eqbal | Ajax'd by TheOnly92 | Updated by Th3-822</b></small>
-</p>
-<span id="loading" style="display: none;">
-&nbsp;&nbsp;
-<?php echo lang(273); ?>
-<img alt="<?php echo lang(274); ?>" src="templates/neatblue/images/ajax-loading.gif" name="pic1" />
-</span>
-<div align="center"><div id="linkchecker-results" style="text-align: left;"></div></div>
+<p style="font-size:11px; color:#888;">Auto-refreshes every 3 seconds</p>
 </div>
 </td>
 </tr>
 </tbody>
 </table>
-<!--End lix checker-->
+<script type="text/javascript">
+/* <![CDATA[ */
+var pendingDownloadsTimer = null;
+
+function formatElapsed(seconds) {
+	var hrs = Math.floor(seconds / 3600);
+	var mins = Math.floor((seconds % 3600) / 60);
+	var secs = seconds % 60;
+	if (hrs > 0) return hrs + 'h ' + mins + 'm';
+	if (mins > 0) return mins + 'm ' + secs + 's';
+	return secs + 's';
+}
+
+function refreshPendingDownloads() {
+	$.ajax({
+		url: 'ajax.php?ajax=pending_downloads',
+		dataType: 'json',
+		timeout: 5000,
+		success: function(data) {
+			$('#pending-downloads-loading').hide();
+			if (data.count > 0) {
+				$('#pending-downloads-empty').hide();
+				$('#pending-downloads-table').show();
+				var html = '';
+				$.each(data.downloads, function(i, dl) {
+					var progressColor = dl.percent >= 100 ? '#4CAF50' : '#2196F3';
+					html += '<tr class="flistmouseoff">';
+					html += '<td title="' + dl.link + '"><b>' + dl.filename + '</b></td>';
+					html += '<td style="width:150px;">';
+					html += '<div style="background:#ddd; border-radius:4px; overflow:hidden; height:20px;">';
+					html += '<div style="background:' + progressColor + '; width:' + dl.percent + '%; height:100%; transition:width 0.3s;"></div>';
+					html += '</div>';
+					html += '<small>' + dl.percent + '%</small>';
+					html += '</td>';
+					html += '<td>' + dl.received + '</td>';
+					html += '<td>' + dl.total + '</td>';
+					html += '<td>' + formatElapsed(dl.elapsed) + '</td>';
+					html += '</tr>';
+				});
+				$('#pending-downloads-body').html(html);
+			} else {
+				$('#pending-downloads-table').hide();
+				$('#pending-downloads-empty').show();
+			}
+		},
+		error: function() {
+			$('#pending-downloads-loading').hide();
+			$('#pending-downloads-empty').text('Error loading downloads').show();
+		}
+	});
+}
+
+function startPendingDownloadsRefresh() {
+	if (pendingDownloadsTimer) clearInterval(pendingDownloadsTimer);
+	$('#pending-downloads-loading').show();
+	refreshPendingDownloads();
+	pendingDownloadsTimer = setInterval(refreshPendingDownloads, 3000);
+}
+
+function stopPendingDownloadsRefresh() {
+	if (pendingDownloadsTimer) {
+		clearInterval(pendingDownloadsTimer);
+		pendingDownloadsTimer = null;
+	}
+}
+
+// Start refresh when tab 4 is clicked
+$(document).ready(function() {
+	$('#navcell4').on('click', function() {
+		startPendingDownloadsRefresh();
+	});
+});
+/* ]]> */
+</script>
+<!--End Pending Downloads-->
 <?php
 	if(isset($_GET["act"]))
 	  {

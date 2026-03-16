@@ -18,6 +18,7 @@ $_REQUEST['premium_acc'] = $_POST['premium_acc'] = $_GET['premium_acc'] = isset(
 $_REQUEST['cookieuse'] = $_POST['cookieuse'] = $_GET['cookieuse'] = isset($_REQUEST['cookieuse']) && $_REQUEST['cookieuse'] == 'on' ? 'on' : false;
 
 require_once(CLASS_DIR . 'cookie.php');
+require_once(CLASS_DIR . 'download_tracker.php');
 
 if (!@file_exists(HOST_DIR . 'download/hosts.php')) html_error(lang(127));
 
@@ -265,6 +266,10 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 
 		$url = parse_url($_GET['link']);
 		if (empty($url['port'])) $url['port'] = $_GET['port'];
+		// Register download for tracking
+		$GLOBALS['current_download_id'] = generate_download_id();
+		register_download($GLOBALS['current_download_id'], $_GET['link'], basename($_GET['filename']), 0);
+		
 		if (isset($url['scheme']) && $url['scheme'] == 'ftp' && empty($_GET['proxy'])) {
 			require_once(CLASS_DIR . 'ftp.php');
 			$file = getftpurl($_GET['host'], defport($url), urldecode($_GET['path']), $pathWithName);
@@ -272,6 +277,11 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 			require_once(CLASS_DIR . 'http.php');
 			!empty($_GET['force_name']) ? $force_name = urldecode($_GET['force_name']) : '';
 			$file = geturl($_GET['host'], defport($url), $_GET['path'], $_GET['referer'], $_GET['cookie'], $_GET['post'], $pathWithName, $_GET['proxy'], $pauth, $auth, $url['scheme']);
+		}
+		
+		// Mark download as complete
+		if (!empty($GLOBALS['current_download_id'])) {
+			complete_download($GLOBALS['current_download_id']);
 		}
 
 		if ($options['redir'] && $lastError && strpos($lastError, substr(lang(95), 0, strpos(lang(95), '%1$s'))) !== false) {
@@ -304,7 +314,7 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		echo sprintf(lang(10), link_for_file($file['file']), $file['size'], $file['time'], $file['speed']);
 		$file['date'] = time();
 
-		if (!write_file(CONFIG_DIR . 'files.lst', serialize(array('name' => $file['file'], 'size' => $file['size'], 'date' => $file['date'], 'link' => $_GET['link'], 'comment' => (!empty($_GET['comment']) ? str_replace(array("\r", "\n"), array('\r', '\n'), $_GET['comment']) : ''))) . "\r\n", 0)) echo lang(9) . '<br />';
+		if (!write_file(CONFIG_DIR . 'files.lst', serialize(array('name' => $file['file'], 'size' => $file['size'], 'date' => $file['date'], 'link' => $_GET['link'], 'comment' => (!empty($_GET['comment']) ? str_replace(array("\r", "\n"), array('\r', '\n'), $_GET['comment']) : ''), 'owner' => (defined('USER_TOKEN') ? USER_TOKEN : ''))) . "\r\n", 0)) echo lang(9) . '<br />';
 
 		if (!empty($_GET['email']) && !$options['disable_email']) {
 			require_once(CLASS_DIR . 'mail.php');

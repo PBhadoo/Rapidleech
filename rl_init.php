@@ -45,5 +45,88 @@ header('Pragma: no-cache');
 
 require_once(CLASS_DIR . 'other.php');
 
+// ============================================
+// USER TOKEN: Cookie-based file ownership
+// Each browser gets a unique token. Files are tagged with
+// the owner's token so users only see their own files.
+// ============================================
+function get_user_token() {
+    if (!empty($_COOKIE['rl_user_token']) && preg_match('/^[a-f0-9]{32}$/', $_COOKIE['rl_user_token'])) {
+        return $_COOKIE['rl_user_token'];
+    }
+    $token = md5(uniqid(mt_rand(), true) . ($_SERVER['REMOTE_ADDR'] ?? '') . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+    // Set cookie for 1 year, httponly
+    @setcookie('rl_user_token', $token, time() + 365 * 86400, '/', '', false, true);
+    $_COOKIE['rl_user_token'] = $token;
+    return $token;
+}
+// Initialize the user token on every request
+define('USER_TOKEN', get_user_token());
+
+// ============================================
+// FAILSAFE: Auto-cleanup when storage hits 99%
+// ============================================
+function check_storage_and_cleanup() {
+    $download_dir = defined('DOWNLOAD_DIR') ? DOWNLOAD_DIR : 'files/';
+    
+    // Get disk space info
+    $total_space = @disk_total_space($download_dir);
+    $free_space = @disk_free_space($download_dir);
+    
+    if ($total_space === false || $free_space === false || $total_space == 0) {
+        return false; // Cannot determine disk space
+    }
+    
+    $used_percent = (($total_space - $free_space) / $total_space) * 100;
+    
+    // If storage usage is 99% or more, clean up the files folder
+    if ($used_percent >= 99) {
+        $files_dir = $download_dir;
+        
+        // Safety check: make sure we're cleaning the right directory
+        if (!is_dir($files_dir)) {
+            return false;
+        }
+        
+        // Log the cleanup action
+        $log_message = date('Y-m-d H:i:s') . " - FAILSAFE TRIGGERED: Storage at " . round($used_percent, 2) . "%. Cleaning up files folder.\n";
+        @file_put_contents(CONFIG_DIR . 'cleanup_log.txt', $log_message, FILE_APPEND | LOCK_EX);
+        
+        // Recursively delete all files in the download directory
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($files_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+        
+        foreach ($files as $fileinfo) {
+            $path = $fileinfo->getRealPath();
+            // Skip index.html to keep directory listing protected
+            if (basename($path) === 'index.html') {
+                continue;
+            }
+            
+            if ($fileinfo->isDir()) {
+                @rmdir($path);
+            } else {
+                @unlink($path);
+            }
+        }
+        
+        // Clear the files list
+        @file_put_contents(CONFIG_DIR . 'files.lst', '');
+        
+        // Log completion
+        $log_message = date('Y-m-d H:i:s') . " - FAILSAFE COMPLETE: Files folder cleaned.\n";
+        @file_put_contents(CONFIG_DIR . 'cleanup_log.txt', $log_message, FILE_APPEND | LOCK_EX);
+        
+        return true;
+    }
+    
+    return false;
+}
+
+// Run the storage check on every request
+check_storage_and_cleanup();
+
 
 ?>

@@ -501,6 +501,39 @@ switch ($_GET['ajax']) {
 			echo array_to_json($AjaxReturn);
 		}
 		break;
+	case 'mega_queue_check':
+		if (!defined('DOWNLOAD_DIR')) define('DOWNLOAD_DIR', $options['download_dir']);
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		if (!file_exists($lockFile)) {
+			echo 'free';
+		} else {
+			$lockData = @json_decode(@file_get_contents($lockFile), true);
+			if (!$lockData || (time() - $lockData['time']) > 300) {
+				echo 'free';
+			} else {
+				echo 'busy';
+			}
+		}
+		break;
+	case 'pending_downloads':
+		require_once(CLASS_DIR . 'download_tracker.php');
+		$downloads = get_active_downloads();
+		$result = array();
+		foreach ($downloads as $dl) {
+			$result[] = array(
+				'id' => $dl['id'],
+				'filename' => htmlspecialchars($dl['filename']),
+				'link' => htmlspecialchars(substr($dl['link'], 0, 80) . (strlen($dl['link']) > 80 ? '...' : '')),
+				'percent' => $dl['percent'],
+				'received' => bytesToKbOrMbOrGb($dl['received_bytes']),
+				'total' => $dl['total_bytes'] > 0 ? bytesToKbOrMbOrGb($dl['total_bytes']) : 'Unknown',
+				'status' => $dl['status'],
+				'elapsed' => time() - $dl['start_time']
+			);
+		}
+		header('Content-Type: application/json');
+		echo json_encode(array('downloads' => $result, 'count' => count($result)));
+		break;
 	case 'linkcheck':
 		require_once(CLASS_DIR.'linkchecker.php');
 		$glinks = array();
