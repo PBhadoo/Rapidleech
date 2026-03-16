@@ -76,6 +76,8 @@ $options = array (
   'rename_these_filetypes_to' => '.xxx',
   'check_these_before_unzipping' => true,
   'fgc' => 0,
+  'parallel_download' => true,
+  'parallel_chunks' => 8,
 ); 
 
 require_once('site_checker.php');

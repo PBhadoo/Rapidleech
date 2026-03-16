@@ -241,6 +241,8 @@ function _create_list() {
 		$dir = dir(DOWNLOAD_DIR);
 		while(false !== ($file = $dir->read())) {
 			if ($file == '.' || $file == '..' || ($tmp = file_data_size_time(DOWNLOAD_DIR.$file)) === false) continue;
+			// Skip .tmp files, .meta files, .part files, and hidden files starting with .
+			if (preg_match('/\.tmp$/i', $file) || preg_match('/\.meta$/i', $file) || preg_match('/\.part$/i', $file) || preg_match('/^\./i', $file)) continue;
 			list($size, $time) = $tmp;
 			// Only show files owned by this user (or legacy unowned files found in list)
 			if (!empty($user_token) && !empty($owned_files) && !isset($owned_files[$file])) continue;
@@ -279,6 +281,15 @@ function _create_list() {
 					if (!empty($date)) $glist[$date] = $listReformat[$key];
 				}
 				unset($glist[$key], $listReformat[$key]);
+			}
+		}
+	}
+	// Filter out .tmp, .part, .meta, and chunk temp files from the list
+	foreach($glist as $key => $item) {
+		if (isset($item['name'])) {
+			$filename = basename($item['name']);
+			if (preg_match('/\.tmp$/i', $filename) || preg_match('/\.meta$/i', $filename) || preg_match('/\.part$/i', $filename) || preg_match('/^\./i', $filename)) {
+				unset($glist[$key]);
 			}
 		}
 	}

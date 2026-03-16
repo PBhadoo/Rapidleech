@@ -8,8 +8,483 @@ require_once(CONFIG_DIR."config.php");
 require_once(CLASS_DIR . 'other.php');
 define ( 'TEMPLATE_DIR', 'templates/'.$options['template_used'].'/' );
 $nn = "\r\n";
+
+// Polyfill for PHP < 8.0
+if (!function_exists('str_ends_with')) {
+    function str_ends_with($haystack, $needle) {
+        return $needle === '' || substr($haystack, -strlen($needle)) === $needle;
+    }
+}
+
 // For ajax calls, lets make it use less resource as possible
 switch ($_GET['ajax']) {
+	case 'pending_downloads':
+		// Get pending/in-progress downloads (files with .part extension or recently modified files)
+		if (!str_ends_with($options['download_dir'], '/')) {
+			$options['download_dir'] .= '/';
+		}
+		$download_dir = $options['download_dir'];
+		$pending = array();
+		$chunkGroups = array(); // Group chunk files by base name
+		$metaFiles = array(); // Store metadata files for chunk downloads
+		$fileMetaFiles = array(); // Store metadata files for single-stream downloads
+		
+		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
+			$now = time();
+			while (($file = readdir($dir)) !== false) {
+				if ($file === '.' || $file === '..') {
+					continue;
+				}
+				$filepath = $download_dir . $file;
+				if (!is_file($filepath)) {
+					continue;
+				}
+				
+				$ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+				$mtime = @filemtime($filepath);
+				$size = @filesize($filepath);
+				$age = $now - $mtime;
+				
+				// Check for chunk metadata files (.chunk_*.meta)
+				if (preg_match('/^\.chunk_([a-f0-9]+)\.meta$/', $file, $matches)) {
+					$metaHash = $matches[1];
+					$metaContent = @file_get_contents($filepath);
+					if ($metaContent) {
+						$metaData = @json_decode($metaContent, true);
+						if ($metaData) {
+							$metaFiles[$metaHash] = $metaData;
+						}
+					}
+					continue;
+				}
+				
+				// Check for per-file metadata (.<filename>.meta)
+				if (preg_match('/^\.(.+)\.meta$/', $file, $matches)) {
+					$originalFile = $matches[1];
+					$metaContent = @file_get_contents($filepath);
+					if ($metaContent) {
+						$metaData = @json_decode($metaContent, true);
+						if ($metaData) {
+							$fileMetaFiles[$originalFile] = $metaData;
+						}
+					}
+					continue;
+				}
+				
+				// Check for parallel download chunk files (.chunk_*_*.tmp)
+				if (preg_match('/^\.chunk_([a-f0-9]+)_(\d+)\.tmp$/', $file, $matches)) {
+					$chunkGroup = $matches[1];
+					$chunkNum = (int)$matches[2];
+					if (!isset($chunkGroups[$chunkGroup])) {
+						$chunkGroups[$chunkGroup] = array(
+							'chunks' => array(),
+							'total_size' => 0,
+							'latest_mtime' => 0,
+							'age' => $age
+						);
+					}
+					$chunkGroups[$chunkGroup]['chunks'][$chunkNum] = $size;
+					$chunkGroups[$chunkGroup]['total_size'] += $size;
+					if ($mtime > $chunkGroups[$chunkGroup]['latest_mtime']) {
+						$chunkGroups[$chunkGroup]['latest_mtime'] = $mtime;
+						$chunkGroups[$chunkGroup]['age'] = $age;
+					}
+					continue;
+				}
+				
+				// Consider as pending if:
+				// 1. Has .part extension (download in progress)
+				// 2. Has .tmp extension
+				// 3. File was modified in last 60 seconds (actively downloading)
+				$isPending = false;
+				$status = '';
+				
+				if ($ext === 'part' || $ext === 'tmp' || $ext === 'download') {
+					$isPending = true;
+					$status = 'Downloading...';
+				} elseif ($age < 60) {
+					$isPending = true;
+					$status = 'Downloading...';
+				} elseif ($age < 300 && $size === 0) {
+					$isPending = true;
+					$status = 'Starting...';
+				}
+				
+				if ($isPending) {
+					// Check if we have metadata for this file
+					$totalSize = 0;
+					$progress = 0;
+					$sizeDisplay = bytesToKbOrMbOrGb($size);
+					
+					if (isset($fileMetaFiles[$file]) && isset($fileMetaFiles[$file]['filesize'])) {
+						$totalSize = $fileMetaFiles[$file]['filesize'];
+						if ($totalSize > 0) {
+							$progress = round(($size / $totalSize) * 100, 1);
+							$sizeDisplay = bytesToKbOrMbOrGb($size) . ' / ' . bytesToKbOrMbOrGb($totalSize);
+							$status = $progress . '%';
+						}
+					}
+					
+					$pending[] = array(
+						'filename' => $file,
+						'size' => $sizeDisplay,
+						'modified' => date('H:i:s', $mtime),
+						'status' => $status,
+						'progress' => $progress,
+						'age' => $age
+					);
+				}
+			}
+			closedir($dir);
+		}
+		
+		// Add parallel chunk downloads as single entries
+		foreach ($chunkGroups as $hash => $group) {
+			$numChunks = count($group['chunks']);
+			
+			// Try to get actual filename from pre-collected metadata
+			$filename = 'Downloading...';
+			$totalSize = $group['total_size'];
+			
+			if (isset($metaFiles[$hash])) {
+				$meta = $metaFiles[$hash];
+				if (isset($meta['filename'])) {
+					$filename = $meta['filename'];
+				}
+				if (isset($meta['filesize'])) {
+					$totalSize = $meta['filesize'];
+				}
+			}
+			
+			$progressPercent = ($totalSize > 0) ? round(($group['total_size'] / $totalSize) * 100, 1) : 0;
+			
+			$pending[] = array(
+				'filename' => $filename,
+				'size' => bytesToKbOrMbOrGb($group['total_size']) . ' / ' . bytesToKbOrMbOrGb($totalSize),
+				'modified' => date('H:i:s', $group['latest_mtime']),
+				'status' => 'Downloading... ' . $progressPercent . '%',
+				'progress' => $progressPercent,
+				'age' => $group['age']
+			);
+		}
+		
+		// Sort by filename alphabetically (ascending)
+		usort($pending, function($a, $b) { return strcasecmp($a['filename'], $b['filename']); });
+		
+		header('Content-Type: application/json');
+		echo json_encode(array('downloads' => $pending));
+		break;
+	
+	case 'queue_status':
+		// Get download queue status AND pending file downloads
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		$downloads = $queue->getAllDownloads();
+		$stats = $queue->getStats();
+		
+		// Get pending file downloads from filesystem
+		if (!str_ends_with($options['download_dir'], '/')) {
+			$options['download_dir'] .= '/';
+		}
+		$download_dir = $options['download_dir'];
+		$pending = array();
+		$chunkGroups = array();
+		$metaFiles = array(); // Store metadata files for chunk downloads
+		$fileMetaFiles = array(); // Store metadata files for single-stream downloads
+		
+		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
+			$now = time();
+			while (($file = readdir($dir)) !== false) {
+				if ($file === '.' || $file === '..') {
+					continue;
+				}
+				$filepath = $download_dir . $file;
+				if (!is_file($filepath)) {
+					continue;
+				}
+				
+				$ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+				$mtime = @filemtime($filepath);
+				$size = @filesize($filepath);
+				$age = $now - $mtime;
+				
+				// Check for chunk metadata files (.chunk_*.meta)
+				if (preg_match('/^\.chunk_([a-f0-9]+)\.meta$/', $file, $matches)) {
+					$metaHash = $matches[1];
+					$metaContent = @file_get_contents($filepath);
+					if ($metaContent) {
+						$metaData = @json_decode($metaContent, true);
+						if ($metaData) {
+							$metaFiles[$metaHash] = $metaData;
+						}
+					}
+					continue;
+				}
+				
+				// Check for per-file metadata (.<filename>.meta)
+				if (preg_match('/^\.(.+)\.meta$/', $file, $matches)) {
+					$originalFile = $matches[1];
+					$metaContent = @file_get_contents($filepath);
+					if ($metaContent) {
+						$metaData = @json_decode($metaContent, true);
+						if ($metaData) {
+							$fileMetaFiles[$originalFile] = $metaData;
+						}
+					}
+					continue;
+				}
+				
+				$mtime = @filemtime($filepath);
+				$size = @filesize($filepath);
+				$age = $now - $mtime;
+				
+				// Check for parallel download chunk files (.chunk_*_*.tmp)
+				if (preg_match('/^\.chunk_([a-f0-9]+)_(\d+)\.tmp$/', $file, $matches)) {
+					$chunkGroup = $matches[1];
+					$chunkNum = (int)$matches[2];
+					if (!isset($chunkGroups[$chunkGroup])) {
+						$chunkGroups[$chunkGroup] = array(
+							'chunks' => array(),
+							'total_size' => 0,
+							'latest_mtime' => 0,
+							'age' => $age
+						);
+					}
+					$chunkGroups[$chunkGroup]['chunks'][$chunkNum] = $size;
+					$chunkGroups[$chunkGroup]['total_size'] += $size;
+					if ($mtime > $chunkGroups[$chunkGroup]['latest_mtime']) {
+						$chunkGroups[$chunkGroup]['latest_mtime'] = $mtime;
+						$chunkGroups[$chunkGroup]['age'] = $age;
+					}
+					continue;
+				}
+				
+				// Consider as pending if: .part/.tmp/.download extension OR recently modified
+				$isPending = false;
+				$status = '';
+				
+				if ($ext === 'part' || $ext === 'tmp' || $ext === 'download') {
+					$isPending = true;
+					$status = 'Downloading...';
+				} elseif ($age < 30) {
+					$isPending = true;
+					$status = 'Downloading...';
+				}
+				
+				if ($isPending) {
+					// Check if we have metadata for this file
+					$totalSize = 0;
+					$progress = 0;
+					$sizeDisplay = bytesToKbOrMbOrGb($size);
+					
+					if (isset($fileMetaFiles[$file]) && isset($fileMetaFiles[$file]['filesize'])) {
+						$totalSize = $fileMetaFiles[$file]['filesize'];
+						if ($totalSize > 0) {
+							$progress = round(($size / $totalSize) * 100, 1);
+							$sizeDisplay = bytesToKbOrMbOrGb($size) . ' / ' . bytesToKbOrMbOrGb($totalSize);
+							$status = $progress . '%';
+						}
+					}
+					
+					$pending[] = array(
+						'filename' => $file,
+						'size' => $sizeDisplay,
+						'status' => $status,
+						'progress' => $progress,
+						'age' => $age
+					);
+				}
+			}
+			closedir($dir);
+		}
+		
+		// Add chunk downloads as single entries with metadata
+		foreach ($chunkGroups as $hash => $group) {
+			$filename = 'Downloading...';
+			$totalSize = $group['total_size'];
+			
+			// Get filename from metadata
+			if (isset($metaFiles[$hash])) {
+				$meta = $metaFiles[$hash];
+				if (isset($meta['filename'])) {
+					$filename = $meta['filename'];
+				}
+				if (isset($meta['filesize'])) {
+					$totalSize = $meta['filesize'];
+				}
+			}
+			
+			$progressPercent = ($totalSize > 0 && $totalSize > $group['total_size']) ? round(($group['total_size'] / $totalSize) * 100, 1) : 0;
+			
+			$pending[] = array(
+				'filename' => $filename,
+				'size' => bytesToKbOrMbOrGb($group['total_size']) . ' / ' . bytesToKbOrMbOrGb($totalSize),
+				'status' => $progressPercent . '%',
+				'progress' => $progressPercent,
+				'age' => $group['age']
+			);
+		}
+		
+		// Sort by filename alphabetically (ascending)
+		usort($pending, function($a, $b) { return strcasecmp($a['filename'], $b['filename']); });
+		
+		// Format queue downloads for display
+		$formatted = array();
+		foreach ($downloads as $dl) {
+			$progress = 0;
+			if ($dl['total_size'] > 0) {
+				$progress = round(($dl['downloaded'] / $dl['total_size']) * 100, 1);
+			}
+			$formatted[] = array(
+				'id' => $dl['id'],
+				'filename' => $dl['filename'] ? $dl['filename'] : basename(parse_url($dl['url'], PHP_URL_PATH)),
+				'url' => $dl['url'],
+				'status' => $dl['status'],
+				'size' => $dl['total_size'] > 0 ? bytesToKbOrMbOrGb($dl['total_size']) : 'Unknown',
+				'downloaded' => bytesToKbOrMbOrGb($dl['downloaded']),
+				'progress' => $progress,
+				'speed' => $dl['speed'] > 0 ? bytesToKbOrMbOrGb($dl['speed']) . '/s' : '-',
+				'resumable' => $dl['resumable'],
+				'chunks' => count($dl['chunks']),
+				'error' => $dl['error'],
+				'added' => date('H:i:s', $dl['added_at'])
+			);
+		}
+		
+		header('Content-Type: application/json');
+		echo json_encode(array('downloads' => $formatted, 'pending' => $pending, 'stats' => $stats));
+		break;
+	
+	case 'queue_add':
+		// Add URL to queue
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$url = isset($_POST['url']) ? trim($_POST['url']) : '';
+		$filename = isset($_POST['filename']) ? trim($_POST['filename']) : '';
+		$opts = array(
+			'referer' => isset($_POST['referer']) ? $_POST['referer'] : '',
+			'cookie' => isset($_POST['cookie']) ? $_POST['cookie'] : ''
+		);
+		
+		if (empty($url)) {
+			header('Content-Type: application/json');
+			echo json_encode(array('success' => false, 'error' => 'URL is required'));
+			break;
+		}
+		
+		$id = $queue->addToQueue($url, $filename, $opts);
+		
+		header('Content-Type: application/json');
+		echo json_encode(array('success' => true, 'id' => $id));
+		break;
+	
+	case 'queue_remove':
+		// Remove from queue
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$id = isset($_POST['id']) ? $_POST['id'] : '';
+		$result = $queue->removeFromQueue($id);
+		
+		header('Content-Type: application/json');
+		echo json_encode(array('success' => $result));
+		break;
+	
+	case 'queue_pause':
+		// Pause download
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$id = isset($_POST['id']) ? $_POST['id'] : '';
+		$result = $queue->pauseDownload($id);
+		
+		header('Content-Type: application/json');
+		echo json_encode(array('success' => $result));
+		break;
+	
+	case 'queue_resume':
+		// Resume download
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$id = isset($_POST['id']) ? $_POST['id'] : '';
+		$result = $queue->resumeDownload($id);
+		
+		header('Content-Type: application/json');
+		echo json_encode(array('success' => $result));
+		break;
+	
+	case 'queue_clear_completed':
+		// Clear completed downloads
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		$queue->clearCompleted();
+		
+		header('Content-Type: application/json');
+		echo json_encode(array('success' => true));
+		break;
+	
+	case 'queue_process':
+		// Process queue - start next download if slots available
+		require_once CLASS_DIR . 'download_queue.php';
+		$queue = new DownloadQueue();
+		
+		$stats = $queue->getStats();
+		$started = 0;
+		
+		// Start downloads up to max concurrent
+		while ($stats['downloading'] + $started < $stats['max_concurrent']) {
+			$next = $queue->getNextQueued();
+			if (!$next) {
+				break;
+			}
+			
+			// Check resume support and file size
+			$info = $queue->checkResumeSupport($next['url'], $next['options']);
+			
+			$updates = array(
+				'status' => 'downloading',
+				'started_at' => time(),
+				'total_size' => $info['size'],
+				'resumable' => $info['resumable'],
+				'filename' => $next['filename'] ? $next['filename'] : $info['filename']
+			);
+			
+			// Create chunks if resumable
+			if ($info['resumable'] && $info['size'] > 0) {
+				$updates['chunks'] = $queue->createChunks($info['size']);
+			} else {
+				// Single chunk for non-resumable
+				$updates['chunks'] = array(array(
+					'id' => 0,
+					'start' => 0,
+					'end' => $info['size'] > 0 ? $info['size'] - 1 : 0,
+					'downloaded' => 0,
+					'status' => 'pending'
+				));
+			}
+			
+			$queue->updateDownload($next['id'], $updates);
+			$started++;
+			
+			// Trigger background download (non-blocking)
+			$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+			$processUrl = $protocol . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/queue_worker.php?id=' . $next['id'];
+			
+			// Use curl to trigger async
+			$ch = curl_init($processUrl);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+			curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
+			curl_exec($ch);
+			curl_close($ch);
+		}
+		
+		header('Content-Type: application/json');
+		echo json_encode(array('success' => true, 'started' => $started));
+		break;
+	
 	case 'server_stats':
 		if ($options['server_info'] && $options['ajax_refresh']) {
 			ob_start();

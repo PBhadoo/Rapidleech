@@ -91,6 +91,53 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 	global $nn, $lastError, $Resume, $bytesReceived, $fp, $fs, $force_name, $options, $sFilters;
 	$scheme = strtolower($scheme) . '://';
 
+	// Try parallel download for file downloads (when saveToFile is provided)
+	// Only use parallel when: no POST data, no resume in progress, file is large enough, cURL available
+	if ($saveToFile && $post === 0 && empty($Resume['use']) && extension_loaded('curl') && function_exists('curl_multi_init')) {
+		// Build full URL
+		$fullScheme = ($scheme == 'ssl://') ? 'https://' : (($scheme == 'https://') ? 'https://' : 'http://');
+		$fullUrl = $fullScheme . $host . ($port != 0 && $port != 80 && $port != 443 ? ':' . $port : '') . $url;
+		
+		// Check if URL supports resume
+		$cookieStr = '';
+		if (!empty($cookie)) {
+			$cookieStr = is_array($cookie) ? CookiesToStr($cookie) : trim($cookie);
+		}
+		
+		$resumeInfo = checkResumeSupport($fullUrl, $cookieStr, $referer, $proxy, $pauth, $auth);
+		
+		// Use parallel download if:
+		// 1. Resume is supported
+		// 2. File size is known and > 2MB (worth parallelizing)
+		// 3. parallel_download option is not disabled
+		$minSizeForParallel = 2 * 1024 * 1024; // 2MB minimum
+		$useParallel = !empty($options['parallel_download']) || !isset($options['parallel_download']); // Default enabled
+		
+		if ($resumeInfo && $resumeInfo['supports_resume'] && $resumeInfo['content_length'] > $minSizeForParallel && $useParallel) {
+			// Check file size limit
+			if ($options['file_size_limit'] > 0 && ($resumeInfo['content_length'] > ($options['file_size_limit'] * 1024 * 1024))) {
+				$lastError = lang(336) . bytesToKbOrMbOrGb($options['file_size_limit'] * 1024 * 1024) . '.';
+				return false;
+			}
+			
+			if ($proxy) echo '<p>' . sprintf(lang(89), $proxy, '') . '<br />GET: <b>' . htmlspecialchars($fullUrl) . "</b>...<br />\n";
+			else echo '<p>'.sprintf(lang(90), $host, $port).'</p>';
+			
+			// Use filename from headers if available
+			if (!empty($resumeInfo['filename']) && empty($force_name)) {
+				$force_name = $resumeInfo['filename'];
+			}
+			
+			$numChunks = isset($options['parallel_chunks']) ? (int)$options['parallel_chunks'] : 8;
+			$result = parallelDownload($fullUrl, $saveToFile, $resumeInfo['content_length'], $numChunks, $cookieStr, $referer, $proxy, $pauth, $auth);
+			
+			if ($result !== false) {
+				return $result;
+			}
+			// If parallel download failed, fall through to single-stream download
+		}
+	}
+
 	if (($post !== 0) && ($scheme == 'http://' || $scheme == 'https://')) {
 		$method = 'POST';
 		$postdata = is_array($post) ? formpostdata($post) : $post;
@@ -346,8 +393,21 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 		if (!empty($Resume['use']) && $Resume['use'] === TRUE && stripos($header, "\nContent-Range: ") !== false) {
 			list($temp, $Resume['range']) = explode(' ', trim(cut_str($header, "\nContent-Range: ", "\n")));
 			list($Resume['range'], $fileSize) = explode('/', $Resume['range']);
+			$fileSizeBytes = (int)$fileSize;
 			$fileSize = bytesToKbOrMbOrGb($fileSize);
-		} else $fileSize = bytesToKbOrMbOrGb($bytesTotal);
+		} else {
+			$fileSizeBytes = (int)$bytesTotal;
+			$fileSize = bytesToKbOrMbOrGb($bytesTotal);
+		}
+		
+		// Create metadata file to track download progress for pending downloads display
+		$metaFile = dirname($saveToFile) . '/.' . basename($saveToFile) . '.meta';
+		@file_put_contents($metaFile, json_encode(array(
+			'filename' => $FileName,
+			'filesize' => $fileSizeBytes,
+			'started' => time()
+		)));
+		
 		$chunkSize = GetChunkSize($bytesTotal);
 		echo(lang(104) . " <b>$FileName</b>, " . lang(56) . " <b>$fileSize</b>...<br />");
 
@@ -413,6 +473,11 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 	stream_socket_shutdown($fp, STREAM_SHUT_RDWR);
 	fclose($fp);
 	if ($saveToFile) {
+		// Cleanup metadata file on completion
+		$metaFile = dirname($saveToFile) . '/.' . basename($saveToFile) . '.meta';
+		if (file_exists($metaFile)) {
+			@unlink($metaFile);
+		}
 		return array('time' => sec2time(round($time)), 'speed' => @round($bytesTotal / 1024 / (microtime(true) - $timeStart), 2), 'received' => true, 'size' => $fileSize, 'bytesReceived' => ($bytesReceived + $Resume['from']), 'bytesTotal' => ($bytesTotal + $Resume ['from']), 'file' => $saveToFile, 'name' => $FileName);
 	} else {
 		if (empty($sFilters['dechunk']) && stripos($header, "\nTransfer-Encoding: chunked") !== false && function_exists('http_chunked_decode')) {
@@ -840,6 +905,348 @@ function upfile($host, $port, $url, $referer, $cookie, $post, $file, $filename, 
 	}
 	$page = $header.$page;
 	return $page;
+}
+
+/**
+ * Check if a URL supports resume/partial downloads
+ * @param string $url The URL to check
+ * @param string $cookie Cookie string
+ * @param string $referer Referer URL
+ * @param string $proxy Proxy in host:port format
+ * @param string $pauth Proxy auth
+ * @param string $auth HTTP auth
+ * @return array|false Returns array with 'supports_resume', 'content_length', 'filename' or false on error
+ */
+function checkResumeSupport($url, $cookie = '', $referer = '', $proxy = '', $pauth = '', $auth = '') {
+    if (!extension_loaded('curl') || !function_exists('curl_init')) {
+        return false;
+    }
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_NOBODY, true);
+    curl_setopt($ch, CURLOPT_HEADER, true);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_USERAGENT, rl_UserAgent);
+    
+    if (!empty($cookie)) {
+        curl_setopt($ch, CURLOPT_COOKIE, is_array($cookie) ? CookiesToStr($cookie) : $cookie);
+    }
+    if (!empty($referer)) {
+        curl_setopt($ch, CURLOPT_REFERER, $referer);
+    }
+    if (!empty($proxy)) {
+        curl_setopt($ch, CURLOPT_PROXY, $proxy);
+        if (!empty($pauth)) {
+            curl_setopt($ch, CURLOPT_PROXYUSERPWD, base64_decode($pauth));
+        }
+    }
+    if (!empty($auth)) {
+        curl_setopt($ch, CURLOPT_USERPWD, base64_decode($auth));
+    }
+    
+    $headers = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+    curl_close($ch);
+    
+    if ($httpCode < 200 || $httpCode >= 400) {
+        return false;
+    }
+    
+    // Check for Accept-Ranges header
+    $supportsResume = (stripos($headers, 'Accept-Ranges: bytes') !== false);
+    
+    // Try to get filename from Content-Disposition
+    $filename = '';
+    if (preg_match('/Content-Disposition:.*filename[*]?=(?:UTF-8\'\')?["\']?([^"\'\r\n;]+)/i', $headers, $match)) {
+        $filename = rawurldecode(trim($match[1], '"\''));
+    }
+    
+    return array(
+        'supports_resume' => $supportsResume,
+        'content_length' => (int)$contentLength,
+        'filename' => $filename
+    );
+}
+
+/**
+ * Download file using parallel chunks (like IDM)
+ * @param string $url The URL to download
+ * @param string $saveToFile The path to save the file
+ * @param int $fileSize The total file size
+ * @param int $numChunks Number of chunks (default 8)
+ * @param string $cookie Cookie string
+ * @param string $referer Referer URL
+ * @param string $proxy Proxy in host:port format
+ * @param string $pauth Proxy auth
+ * @param string $auth HTTP auth
+ * @return array|false Returns download info array or false on error
+ */
+function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie = '', $referer = '', $proxy = '', $pauth = '', $auth = '') {
+    global $nn, $lastError, $bytesReceived, $options, $force_name;
+    
+    if (!extension_loaded('curl') || !function_exists('curl_multi_init')) {
+        $lastError = 'cURL multi not available';
+        return false;
+    }
+    
+    // Minimum chunk size of 1MB, reduce chunks for smaller files
+    $minChunkSize = 1024 * 1024;
+    if ($fileSize < $minChunkSize * $numChunks) {
+        $numChunks = max(1, floor($fileSize / $minChunkSize));
+    }
+    
+    $chunkSize = ceil($fileSize / $numChunks);
+    $chunks = array();
+    
+    // Create chunk ranges
+    for ($i = 0; $i < $numChunks; $i++) {
+        $start = $i * $chunkSize;
+        $end = min(($i + 1) * $chunkSize - 1, $fileSize - 1);
+        $chunks[$i] = array(
+            'start' => $start,
+            'end' => $end,
+            'size' => $end - $start + 1,
+            'downloaded' => 0,
+            'file' => dirname($saveToFile) . '/.chunk_' . md5($url) . '_' . $i . '.tmp'
+        );
+    }
+    
+    // Get filename
+    $FileName = $force_name ? $force_name : basename($saveToFile);
+    $FileName = str_replace(array_merge(range(chr(0), chr(31)), str_split("<>:\"/|?*\x5C\x7F")), '', basename(trim($FileName)));
+    
+    $extPos = strrpos($FileName, '.');
+    $ext = ($extPos ? substr($FileName, $extPos) : '');
+    if (is_array($options['forbidden_filetypes']) && in_array(strtolower($ext), array_map('strtolower', $options['forbidden_filetypes']))) {
+        if ($options['forbidden_filetypes_block']) return html_error(sprintf(lang(82), $ext));
+        if (empty($options['rename_these_filetypes_to'])) $options['rename_these_filetypes_to'] = '.xxx';
+        elseif (strpos($options['rename_these_filetypes_to'], '.') === false) $options['rename_these_filetypes_to'] = '.' . $options['rename_these_filetypes_to'];
+        $FileName = substr_replace($FileName, $options['rename_these_filetypes_to'], $extPos);
+    }
+    
+    if (!empty($options['rename_prefix'])) $FileName = $options['rename_prefix'] . '_' . $FileName;
+    if (!empty($options['rename_suffix'])) $FileName = ($extPos > 0 ? substr($FileName, 0, $extPos) : $FileName) . '_' . $options['rename_suffix'] . $ext;
+    if (!empty($options['rename_underscore'])) $FileName = str_replace(array(' ', '%20'), '_', $FileName);
+    
+    $saveToFile = dirname($saveToFile) . PATH_SPLITTER . $FileName;
+    
+    // Check if file exists
+    if (@file_exists($saveToFile)) {
+        if ($options['bw_save']) return html_error(lang(99) . ': ' . link_for_file($saveToFile));
+        $FileName = time() . '_' . $FileName;
+        $saveToFile = dirname($saveToFile) . PATH_SPLITTER . $FileName;
+    }
+    
+    // Create metadata file to track filename for pending downloads display
+    $chunkHash = md5($url);
+    $metaFile = dirname($saveToFile) . '/.chunk_' . $chunkHash . '.meta';
+    @file_put_contents($metaFile, json_encode(array(
+        'filename' => $FileName,
+        'filesize' => $fileSize,
+        'chunks' => $numChunks,
+        'url' => $url,
+        'started' => time()
+    )));
+    
+    $fileSizeDisplay = bytesToKbOrMbOrGb($fileSize);
+    echo(lang(104) . " <b>$FileName</b>, " . lang(56) . " <b>$fileSizeDisplay</b>...<br />");
+    
+    require_once(TEMPLATE_DIR . '/transloadui.php');
+    flush();
+    
+    $timeStart = microtime(true);
+    $mh = curl_multi_init();
+    $handles = array();
+    $fileHandles = array();
+    
+    // Initialize all chunk downloads
+    for ($i = 0; $i < $numChunks; $i++) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RANGE, $chunks[$i]['start'] . '-' . $chunks[$i]['end']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, rl_UserAgent);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 0); // No timeout for download
+        
+        if (!empty($cookie)) {
+            curl_setopt($ch, CURLOPT_COOKIE, is_array($cookie) ? CookiesToStr($cookie) : $cookie);
+        }
+        if (!empty($referer)) {
+            curl_setopt($ch, CURLOPT_REFERER, $referer);
+        }
+        if (!empty($proxy)) {
+            curl_setopt($ch, CURLOPT_PROXY, $proxy);
+            if (!empty($pauth)) {
+                curl_setopt($ch, CURLOPT_PROXYUSERPWD, base64_decode($pauth));
+            }
+        }
+        if (!empty($auth)) {
+            curl_setopt($ch, CURLOPT_USERPWD, base64_decode($auth));
+        }
+        
+        // Open chunk file for writing
+        $fp = @fopen($chunks[$i]['file'], 'wb');
+        if (!$fp) {
+            $lastError = "Failed to create chunk file: " . $chunks[$i]['file'];
+            curl_multi_close($mh);
+            return false;
+        }
+        flock($fp, LOCK_EX);
+        $fileHandles[$i] = $fp;
+        curl_setopt($ch, CURLOPT_FILE, $fp);
+        
+        $handles[$i] = $ch;
+        curl_multi_add_handle($mh, $ch);
+    }
+    
+    // Execute all downloads in parallel
+    $running = null;
+    $lastUpdate = 0;
+    $bytesReceived = 0;
+    
+    do {
+        $status = curl_multi_exec($mh, $running);
+        
+        if ($status > CURLM_OK) {
+            $lastError = 'cURL multi error: ' . curl_multi_strerror($status);
+            break;
+        }
+        
+        // Update progress every second
+        $now = microtime(true);
+        if ($now - $lastUpdate >= 1) {
+            $totalDownloaded = 0;
+            foreach ($handles as $i => $ch) {
+                $info = curl_getinfo($ch);
+                $totalDownloaded += $info['size_download'];
+            }
+            
+            $bytesReceived = $totalDownloaded;
+            $percent = $fileSize > 0 ? round($totalDownloaded / $fileSize * 100, 2) : 0;
+            $time = $now - $timeStart;
+            $speed = $time > 0 ? round($totalDownloaded / 1024 / $time, 2) : 0;
+            $received = bytesToKbOrMbOrGb($totalDownloaded);
+            
+            echo "<script type='text/javascript'>pr('$percent', '$received', '$speed');</script>";
+            flush();
+            $lastUpdate = $now;
+        }
+        
+        // Wait for activity
+        if ($running > 0) {
+            curl_multi_select($mh, 0.5);
+        }
+        
+    } while ($running > 0);
+    
+    // Close all handles and file pointers
+    $allSuccess = true;
+    foreach ($handles as $i => $ch) {
+        $info = curl_getinfo($ch);
+        $httpCode = $info['http_code'];
+        $downloaded = $info['size_download'];
+        
+        flock($fileHandles[$i], LOCK_UN);
+        fclose($fileHandles[$i]);
+        
+        curl_multi_remove_handle($mh, $ch);
+        curl_close($ch);
+        
+        // Check if chunk downloaded successfully
+        if ($httpCode < 200 || $httpCode >= 400 || $downloaded < $chunks[$i]['size'] * 0.95) {
+            $allSuccess = false;
+        }
+        $chunks[$i]['downloaded'] = $downloaded;
+    }
+    curl_multi_close($mh);
+    
+    if (!$allSuccess) {
+        // Cleanup chunk files and metadata
+        foreach ($chunks as $chunk) {
+            if (file_exists($chunk['file'])) {
+                @unlink($chunk['file']);
+            }
+        }
+        if (isset($metaFile) && file_exists($metaFile)) {
+            @unlink($metaFile);
+        }
+        $lastError = lang(106);
+        return false;
+    }
+    
+    // Merge chunks into final file
+    $finalFp = @fopen($saveToFile, 'wb');
+    if (!$finalFp) {
+        $lastError = sprintf(lang(101), $FileName, dirname($saveToFile));
+        foreach ($chunks as $chunk) {
+            @unlink($chunk['file']);
+        }
+        if (isset($metaFile) && file_exists($metaFile)) {
+            @unlink($metaFile);
+        }
+        return false;
+    }
+    
+    flock($finalFp, LOCK_EX);
+    $bytesReceived = 0;
+    
+    for ($i = 0; $i < $numChunks; $i++) {
+        $chunkData = @file_get_contents($chunks[$i]['file']);
+        if ($chunkData === false) {
+            flock($finalFp, LOCK_UN);
+            fclose($finalFp);
+            @unlink($saveToFile);
+            foreach ($chunks as $chunk) {
+                @unlink($chunk['file']);
+            }
+            if (isset($metaFile) && file_exists($metaFile)) {
+                @unlink($metaFile);
+            }
+            $lastError = 'Failed to read chunk ' . $i;
+            return false;
+        }
+        fwrite($finalFp, $chunkData);
+        $bytesReceived += strlen($chunkData);
+        unset($chunkData);
+        @unlink($chunks[$i]['file']);
+    }
+    
+    flock($finalFp, LOCK_UN);
+    fclose($finalFp);
+    
+    // Cleanup metadata file
+    if (isset($metaFile) && file_exists($metaFile)) {
+        @unlink($metaFile);
+    }
+    
+    $time = microtime(true) - $timeStart;
+    $speed = $time > 0 ? round($bytesReceived / 1024 / $time, 2) : 0;
+    
+    echo '<script type="text/javascript">pr(100, \'' . bytesToKbOrMbOrGb($bytesReceived) . '\', \'' . $speed . '\')</script>';
+    flush();
+    
+    return array(
+        'time' => sec2time(round($time)),
+        'speed' => $speed,
+        'received' => true,
+        'size' => $fileSizeDisplay,
+        'bytesReceived' => $bytesReceived,
+        'bytesTotal' => $fileSize,
+        'file' => $saveToFile,
+        'name' => $FileName
+    );
 }
 
 function putfile($host, $port, $url, $referer, $cookie, $file, $filename, $proxy = 0, $pauth = 0, $upagent = 0, $scheme = 'http') {
