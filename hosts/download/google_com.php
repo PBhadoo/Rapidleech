@@ -126,25 +126,65 @@ class google_com extends DownloadClass {
 
 	private function Folder() {
 		if (isset($_GET['audl'])) html_error('Cannot check folder in audl.');
-		$page = $this->GetPage('https://drive.google.com/drive/folders/' . $this->ID);
-		$this->isPrivate($page);
 
 		$ids = array();
-		// Try multiple patterns for extracting file IDs from folder page
-		if (preg_match_all('@\["([\w\-]{20,})"@', $page, $matches)) {
+
+		// Method 1: Try the embedded folder view (most reliable for public folders)
+		$page = $this->GetPage('https://drive.google.com/embeddedfolderview?id=' . $this->ID . '#list');
+		$this->isPrivate($page);
+		if (preg_match_all('@/file/d/([\w\-]{10,})@', $page, $matches)) {
 			$ids = array_unique($matches[1]);
-			// Remove the folder's own ID
+		}
+		if (empty($ids) && preg_match_all('@\bid=([\w\-]{10,})@', $page, $matches)) {
+			$ids = array_unique($matches[1]);
 			$ids = array_diff($ids, array($this->ID));
 		}
-		if (empty($ids) && preg_match_all('@/file/d/([\w\-]{20,})@', $page, $matches)) {
-			$ids = array_unique($matches[1]);
-		}
-		if (empty($ids) && preg_match_all('@\\\x5b\\\x22([\w\-]{20,})\\\x22,@i', $page, $matches)) {
-			$ids = $matches[1];
+
+		// Method 2: Try regular folder page and parse AF_initDataCallback JSON
+		if (empty($ids)) {
+			$page = $this->GetPage('https://drive.google.com/drive/folders/' . $this->ID);
+			$this->isPrivate($page);
+			$body = $page;
+			if (($pos = strpos($body, "\r\n\r\n")) !== false) $body = substr($body, $pos + 4);
+
+			// Google embeds folder data in AF_initDataCallback script blocks
+			// File IDs appear as quoted strings of 20+ alphanumeric chars
+			if (preg_match_all('@"([\w\-]{20,})"@', $body, $matches)) {
+				$all_ids = array_unique($matches[1]);
+				// Filter: keep only IDs that appear alongside Google Drive patterns
+				foreach ($all_ids as $candidate) {
+					if ($candidate === $this->ID) continue;
+					// Check if this ID looks like a Google Drive file ID (length 20-60, alphanumeric with dashes/underscores)
+					if (strlen($candidate) >= 20 && strlen($candidate) <= 60 && preg_match('@^[\w\-]+$@', $candidate)) {
+						$ids[] = $candidate;
+					}
+				}
+			}
+			// Also try escaped JSON patterns
+			if (empty($ids) && preg_match_all('@\\\\x22([\w\-]{20,})\\\\x22@', $body, $matches)) {
+				$ids = array_unique($matches[1]);
+				$ids = array_diff($ids, array($this->ID));
+			}
+			// Try unescaped JSON array patterns
+			if (empty($ids) && preg_match_all('@\["([\w\-]{20,})"@', $body, $matches)) {
+				$ids = array_unique($matches[1]);
+				$ids = array_diff($ids, array($this->ID));
+			}
 		}
 
-		if (empty($ids)) html_error('Empty folder or could not read folder contents.');
+		// Method 3: Try Google Drive API-style listing (works for some shared folders)
+		if (empty($ids)) {
+			$apiUrl = 'https://clients6.google.com/drive/v2beta/files?q=%27' . $this->ID . '%27+in+parents&fields=items(id)&maxResults=1000';
+			$apiPage = $this->GetPage($apiUrl, 0, 0, 'https://drive.google.com/');
+			if (preg_match_all('@"id"\s*:\s*"([\w\-]{10,})"@', $apiPage, $matches)) {
+				$ids = array_unique($matches[1]);
+				$ids = array_diff($ids, array($this->ID));
+			}
+		}
 
+		if (empty($ids)) html_error('Empty folder, private folder, or could not read folder contents. Make sure the folder is shared publicly.');
+
+		$ids = array_values(array_unique($ids));
 		$links = array();
 		foreach ($ids as $id) {
 			$links[] = "https://drive.google.com/uc?id=$id&export=download";
