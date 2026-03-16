@@ -75,7 +75,7 @@ php -r 'echo "mbstring: " . (extension_loaded("mbstring") ? "YES" : "NO") . "\n\
 # Clone RapidLeech
 cd /var/www
 sudo rm -rf html
-sudo git clone https://github.com/temp-deployers/Rapidleech html
+sudo git clone https://github.com/PBhadoo/Rapidleech html
 cd /var/www/html
 
 # Set permissions
