@@ -96,14 +96,85 @@ class DownloadClass {
 
 		if (!is_file('audl.php') || !empty($GLOBALS['options']['auto_download_disable'])) html_error('audl.php not found or you have disable auto download feature!');
 
+		// If coming from audl (batch mode), skip selection
+		if (isset($_GET['audl'])) {
+			$pos = strrpos($_SERVER['SCRIPT_NAME'], '/');
+			$audlpath = ($pos !== false) ? substr($_SERVER['SCRIPT_NAME'], 0, $pos + 1).'audl.php?GO=GO' : 'audl.php?GO=GO';
+			$inputs = GetDefaultParams();
+			$inputs['links'] = implode("\r\n", $link_array);
+			$key_array = array('premium_acc', 'premium_user', 'premium_pass', 'cookieuse', 'cookie');
+			foreach ($key_array as $v) if (!empty($_GET[$v])) $inputs[$v] = urlencode($_GET[$v]);
+			insert_location($inputs, $audlpath);
+			exit();
+		}
+
+		// Show file selection page
 		$pos = strrpos($_SERVER['SCRIPT_NAME'], '/');
 		$audlpath = ($pos !== false) ? substr($_SERVER['SCRIPT_NAME'], 0, $pos + 1).'audl.php?GO=GO' : 'audl.php?GO=GO';
-		$inputs = GetDefaultParams();
-		$inputs['links'] = implode("\r\n", $link_array);
 
+		echo '<div style="text-align:center;padding:20px;">';
+		echo '<h3 style="margin-bottom:16px;">📁 Folder Contents — Select Files to Download</h3>';
+		echo '<p style="color:var(--fl-text-3,#888);margin-bottom:20px;">Found <strong>' . count($link_array) . '</strong> files. Select the ones you want to download.</p>';
+
+		echo '<form action="' . htmlspecialchars($audlpath) . '" method="POST" id="folderSelectForm">';
+		// Pass through settings
+		$params = GetDefaultParams();
 		$key_array = array('premium_acc', 'premium_user', 'premium_pass', 'cookieuse', 'cookie');
-		foreach ($key_array as $v) if (!empty($_GET[$v])) $inputs[$v] = urlencode($_GET[$v]);
-		insert_location($inputs, $audlpath);
+		foreach ($key_array as $v) if (!empty($_GET[$v])) $params[$v] = $_GET[$v];
+		foreach ($params as $k => $v) echo '<input type="hidden" name="' . htmlspecialchars($k) . '" value="' . htmlspecialchars($v) . '">';
+
+		echo '<div style="margin-bottom:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">';
+		echo '<button type="button" onclick="toggleAll(true)" style="padding:6px 14px;border-radius:8px;border:1px solid var(--fl-border,#282d3e);background:var(--fl-surface-alt,#1e2231);color:var(--fl-text,#e8ecf4);cursor:pointer;font-size:13px;">✅ Select All</button>';
+		echo '<button type="button" onclick="toggleAll(false)" style="padding:6px 14px;border-radius:8px;border:1px solid var(--fl-border,#282d3e);background:var(--fl-surface-alt,#1e2231);color:var(--fl-text,#e8ecf4);cursor:pointer;font-size:13px;">❌ Deselect All</button>';
+		echo '</div>';
+
+		echo '<div style="text-align:left;max-width:700px;margin:0 auto;background:var(--fl-surface,#161924);border:1px solid var(--fl-border,#282d3e);border-radius:12px;overflow:hidden;">';
+		foreach ($link_array as $i => $link) {
+			// Extract filename from URL
+			$parsed = parse_url($link);
+			$fname = !empty($parsed['path']) ? basename(urldecode($parsed['path'])) : 'File ' . ($i + 1);
+			// For mega internal links, just show file number
+			if (strpos($link, '#N!') !== false || strpos($link, '#!') !== false) $fname = 'File ' . ($i + 1);
+			// Try to get a cleaner name from the link
+			if (preg_match('/[?&](?:filename|name)=([^&]+)/i', $link, $fn)) $fname = urldecode($fn[1]);
+
+			$bg = ($i % 2 === 0) ? 'var(--fl-surface,#161924)' : 'var(--fl-surface-alt,#1e2231)';
+			echo '<label style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;background:' . $bg . ';border-bottom:1px solid var(--fl-border,#282d3e);">';
+			echo '<input type="checkbox" name="sel_links[]" value="' . htmlspecialchars($link) . '" checked style="width:18px;height:18px;accent-color:#6366f1;">';
+			echo '<span style="font-size:13px;word-break:break-all;">' . htmlspecialchars($fname) . '</span>';
+			echo '</label>';
+		}
+		echo '</div>';
+
+		echo '<div style="margin-top:20px;">';
+		echo '<button type="submit" onclick="return prepareSubmit()" style="padding:12px 28px;border-radius:10px;border:0;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;font-size:15px;font-weight:600;cursor:pointer;">⬇️ Download Selected (<span id="selCount">' . count($link_array) . '</span> files)</button>';
+		echo '</div>';
+		echo '</form>';
+		echo '</div>';
+
+		echo '<script type="text/javascript">
+		function toggleAll(state) {
+			document.querySelectorAll("input[name=\'sel_links[]\']").forEach(function(cb) { cb.checked = state; });
+			updateCount();
+		}
+		function updateCount() {
+			var c = document.querySelectorAll("input[name=\'sel_links[]\']:checked").length;
+			document.getElementById("selCount").textContent = c;
+		}
+		document.querySelectorAll("input[name=\'sel_links[]\']").forEach(function(cb) { cb.addEventListener("change", updateCount); });
+		function prepareSubmit() {
+			var checked = document.querySelectorAll("input[name=\'sel_links[]\']:checked");
+			if (checked.length === 0) { alert("Please select at least one file."); return false; }
+			var links = [];
+			checked.forEach(function(cb) { links.push(cb.value); });
+			var input = document.createElement("input");
+			input.type = "hidden"; input.name = "links"; input.value = links.join("\\r\\n");
+			document.getElementById("folderSelectForm").appendChild(input);
+			return true;
+		}
+		</script>';
+
+		include(TEMPLATE_DIR.'footer.php');
 		exit();
 	}
 
