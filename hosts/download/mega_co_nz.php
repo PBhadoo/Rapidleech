@@ -421,10 +421,10 @@ class mega_co_nz extends DownloadClass {
 				if (!extension_loaded('bcmath')) html_error('This plugin needs BCMath extension for re-login.');
 				$this->cookie['sid'] = $cookie['sid'] = false; // Do not send old sid or it will get '-15' error.
 				$res = $this->apiReq(array('a' => 'us', 'user' => $user, 'uh' => $cookie['user_handle']));
-				if (is_numeric($res[0])) $this->CheckEr($res[0], 'Cannot re-login');
+				if (is_numeric($res[0])) $this->CheckErr($res[0], 'Cannot re-login');
 				$rsa_priv_key = explode('/T8\\', $cookie['rsa_priv_key']);
 				$cookie['sid'] = $this->base64url_encode(substr(strrev($this->rsa_decrypt($this->mpi2bc($this->base64url_decode($res[0]['csid'])), $rsa_priv_key[0], $rsa_priv_key[1], $rsa_priv_key[2])), 0, 43));
-			} else $this->CheckEr($quota[0], 'Cannot validate saved-login');
+		} else $this->CheckErr($quota[0], 'Cannot validate saved-login');
 		}
 		$this->cookie = $cookie;
 		$this->cJar_save($user, $pass); // Update last used time.
@@ -448,10 +448,26 @@ class mega_co_nz extends DownloadClass {
 	private function Login($user, $pass) {
 		if (!extension_loaded('bcmath')) html_error('This plugin needs BCMath extension for login.');
 		$this->cookie = array();
-		$password_aes = $this->prepare_key($this->str_to_a32($pass));
-		$this->cookie['user_handle'] = $this->stringhash($user, $password_aes);
+
+		// Check account version (v1 uses stringhash, v2 uses PBKDF2)
+		$prelogin = $this->apiReq(array('a' => 'us0', 'user' => $user));
+		$accountVersion = (!is_numeric($prelogin[0]) && !empty($prelogin[0]['v'])) ? intval($prelogin[0]['v']) : 1;
+
+		if ($accountVersion >= 2 && !empty($prelogin[0]['s'])) {
+			// V2 login: PBKDF2 key derivation
+			$salt = $this->base64url_decode($prelogin[0]['s']);
+			// Derive 32 bytes using PBKDF2-SHA512 with 100000 iterations
+			$derivedKey = hash_pbkdf2('sha512', $pass, $salt, 100000, 32, true);
+			$password_aes = $this->str_to_a32(substr($derivedKey, 0, 16));
+			$this->cookie['user_handle'] = $this->base64url_encode(substr($derivedKey, 16, 16));
+		} else {
+			// V1 login: legacy stringhash method
+			$password_aes = $this->prepare_key($this->str_to_a32($pass));
+			$this->cookie['user_handle'] = $this->stringhash($user, $password_aes);
+		}
+
 		$res = $this->apiReq(array('a' => 'us', 'user' => $user, 'uh' => $this->cookie['user_handle']));
-		if (is_numeric($res[0])) $this->CheckEr($res[0], 'Cannot login');
+		if (is_numeric($res[0])) $this->CheckErr($res[0], 'Cannot login');
 		$master_key = $this->decrypt_key($this->base64_to_a32($res[0]['k']), $password_aes);
 		$privk = $this->a32_to_str($this->decrypt_key($this->base64_to_a32($res[0]['privk']), $master_key));
 		$rsa_priv_key = array(0, 0, 0, 0);
