@@ -361,7 +361,7 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 			flush();
 		} else $Resume = array('use' => false, 'from' => 0, 'range' => 0);
 
-		$time = $last = $lastChunkTime = 0;
+		$time = $last = $lastChunkTime = $lastProgressTime = 0;
 		do {
 			$data = @fread($fp, $chunkSize);
 			$datalen = strlen($data);
@@ -371,28 +371,29 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 				$bytesReceived += $bytesSaved;
 			} else {
 				$lastError = sprintf(lang(105), $FileName);
-				// unlink($saveToFile);
 				return false;
 			}
 			if ($bytesReceived >= $bytesTotal) $percent = 100;
 			else $percent = @round(($bytesReceived + $Resume['from']) / ($bytesTotal + $Resume['from']) * 100, 2);
-			if ($bytesReceived > $last + $chunkSize && (!$lastChunkTime || !(((microtime(true) - $timeStart) - $lastChunkTime) < 1))) {
+			// Update progress every 0.5 seconds or every chunk worth of data
+			$now = microtime(true);
+			$timeSinceLastProgress = $now - $timeStart - $lastProgressTime;
+			if ($timeSinceLastProgress >= 0.5 || $bytesReceived >= $bytesTotal) {
 				$received = bytesToKbOrMbOrGb($bytesReceived + $Resume['from']);
-				$time = microtime(true) - $timeStart;
+				$time = $now - $timeStart;
 				$chunkTime = $time - $lastChunkTime;
 				$chunkTime = ($chunkTime > 0) ? $chunkTime : 1;
 				$lastChunkTime = $time;
+				$lastProgressTime = $time;
 				$speed = @round((($bytesReceived - $last) / 1024) / $chunkTime, 2);
 				echo "<script type='text/javascript'>pr('$percent', '$received', '$speed');</script>";
 				flush();
 				$last = $bytesReceived;
 				
-				// Update download tracker for background monitoring
 				if (!empty($GLOBALS['current_download_id']) && function_exists('update_download_progress')) {
 					update_download_progress($GLOBALS['current_download_id'], $bytesReceived + $Resume['from'], $bytesTotal + $Resume['from']);
 				}
 			}
-			if (!empty($bytesTotal) && ($bytesReceived + $chunkSize) > $bytesTotal) $chunkSize = max($bytesTotal - $bytesReceived, 65536);
 		} while (!feof($fp));
 
 		flock($fs, LOCK_UN);
