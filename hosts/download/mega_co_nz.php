@@ -49,8 +49,13 @@ class mega_co_nz extends DownloadClass {
 		} while (!empty($user) && !empty($pass) && empty($this->cookie['sid']) && $tLimit && $this->cJar_load($user, $pass));
 
 		if ($tLimit) {
-			if (empty($this->cookie['sid'])) html_error('Anonymous Traffic Limit Reached, add an account then try again.');
-			else html_error('Traffic Limit Reached.');
+			$debugInfo = '';
+			if (!empty($user)) $debugInfo .= '<br>Account: ' . htmlspecialchars(substr($user, 0, 3)) . '***';
+			if (!empty($this->cookie['sid'])) $debugInfo .= '<br>Session: Active (logged in)';
+			else $debugInfo .= '<br>Session: None (not logged in)';
+			if (!extension_loaded('bcmath')) $debugInfo .= '<br>Warning: bcmath extension not loaded (required for Mega login)';
+			if (empty($this->cookie['sid'])) html_error('Transfer Quota Exceeded (Anonymous).<br>To bypass: configure a Mega account in configs/accounts.php and check "Use Premium Account" in Settings tab.' . $debugInfo);
+			else html_error('Transfer Quota Exceeded even with Premium account. Your Mega plan quota may be used up.' . $debugInfo);
 		}
 
 		$key = $this->base64_to_a32($fid[3]);
