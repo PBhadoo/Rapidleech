@@ -73,9 +73,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
 
         case 'git_update':
-            $cmd = "cd $rootDir && cp configs/accounts.php configs/accounts.php.bak && cp configs/config.php configs/config.php.bak && git fetch origin main && git reset --hard origin/main && cp configs/accounts.php.bak configs/accounts.php && cp configs/config.php.bak configs/config.php && chmod -R 777 files/ configs/ 2>&1";
+            $repoUrl = trim($_POST['repo_url'] ?? 'https://github.com/PBhadoo/Rapidleech');
+            $branch = trim($_POST['repo_branch'] ?? 'main');
+            // Sanitize inputs - only allow valid git URLs and branch names
+            if (!preg_match('/^https:\/\/[a-zA-Z0-9._\-\/]+$/', $repoUrl)) {
+                $message = 'Invalid repository URL.';
+                $messageType = 'error';
+                break;
+            }
+            if (!preg_match('/^[a-zA-Z0-9._\-\/]+$/', $branch)) {
+                $message = 'Invalid branch name.';
+                $messageType = 'error';
+                break;
+            }
+            $repoUrl = escapeshellarg($repoUrl);
+            $branch = escapeshellarg($branch);
+            $cmd = "cd $rootDir && cp configs/accounts.php configs/accounts.php.bak && cp configs/config.php configs/config.php.bak && git remote set-url origin $repoUrl && git fetch origin $branch && git reset --hard origin/$branch && cp configs/accounts.php.bak configs/accounts.php && cp configs/config.php.bak configs/config.php && chmod -R 777 files/ configs/ 2>&1";
             $output = shell_exec($cmd);
-            $message = "Git update completed.";
+            $message = "Git update completed from " . htmlspecialchars(trim($_POST['repo_url'] ?? 'https://github.com/PBhadoo/Rapidleech')) . " ($branch).";
             $messageType = 'success';
             break;
     }
@@ -199,9 +214,19 @@ a.back:hover{text-decoration:underline}
     <!-- Git Update -->
     <div class="card">
         <h2>🔄 Quick Update from GitHub</h2>
-        <h3>Pulls latest code, preserves accounts.php and config.php</h3>
-        <form method="POST" onsubmit="return confirm('This will update all code from GitHub. Your accounts and config will be preserved.');">
+        <h3>Pulls latest code from a GitHub repo. Preserves accounts.php and config.php.</h3>
+        <form method="POST" onsubmit="return confirm('This will update all code from the specified repo. Your accounts and config will be preserved.');">
             <input type="hidden" name="action" value="git_update">
+            <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:12px">
+                <div>
+                    <label style="display:block;font-size:12px;color:#606880;margin-bottom:4px">Repository URL</label>
+                    <input type="text" name="repo_url" placeholder="https://github.com/PBhadoo/Rapidleech" value="<?php echo htmlspecialchars($_POST['repo_url'] ?? 'https://github.com/PBhadoo/Rapidleech'); ?>">
+                </div>
+                <div style="min-width:120px">
+                    <label style="display:block;font-size:12px;color:#606880;margin-bottom:4px">Branch</label>
+                    <input type="text" name="repo_branch" placeholder="main" value="<?php echo htmlspecialchars($_POST['repo_branch'] ?? 'main'); ?>">
+                </div>
+            </div>
             <button type="submit" class="btn btn-primary">🔄 Update from GitHub</button>
         </form>
         <?php if (isset($output) && $_POST['action'] === 'git_update'): ?>
@@ -226,7 +251,9 @@ a.back:hover{text-decoration:underline}
     </div>
 
     <div style="text-align:center;padding:20px;color:#606880;font-size:12px">
-        RapidLeech Admin Panel • PHP <?php echo PHP_VERSION; ?> • <?php echo PHP_OS; ?>
+        <a href="https://github.com/PBhadoo/Rapidleech" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;font-weight:700;">RapidLeech</a> v2.0.1 • Admin Panel • PHP <?php echo PHP_VERSION; ?> • <?php echo PHP_OS; ?>
+        <br>Built with <a href="https://www.anthropic.com/" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;">Claude Opus 4.6</a> by <a href="https://www.anthropic.com/" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;">Anthropic</a>
+        <br>&copy; <?php echo date('Y'); ?> <a href="https://github.com/PBhadoo/Rapidleech" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;">PBhadoo</a>. All rights reserved.
     </div>
 </div>
 </body>
