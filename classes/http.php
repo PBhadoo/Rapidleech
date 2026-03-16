@@ -392,7 +392,7 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 					update_download_progress($GLOBALS['current_download_id'], $bytesReceived + $Resume['from'], $bytesTotal + $Resume['from']);
 				}
 			}
-			if (!empty($bytesTotal) && ($bytesReceived + $chunkSize) > $bytesTotal) $chunkSize = max($bytesTotal - $bytesReceived, 4096);
+			if (!empty($bytesTotal) && ($bytesReceived + $chunkSize) > $bytesTotal) $chunkSize = max($bytesTotal - $bytesReceived, 65536);
 		} while (!feof($fp));
 
 		flock($fs, LOCK_UN);
@@ -601,21 +601,15 @@ function StrToCookies($cookies, $cookie=array(), $del=true, $dval=array('','dele
 }
 
 function GetChunkSize($fsize) {
-	if ($fsize <= 0) return 4096;
-	if ($fsize < 4096) return intval($fsize);
-	if ($fsize <= 1024 * 1024) return 4096;
-	if ($fsize <= 1024 * 1024 * 10) return 4096 * 10;
-	if ($fsize <= 1024 * 1024 * 40) return 4096 * 30;
-	if ($fsize <= 1024 * 1024 * 80) return 4096 * 47;
-	if ($fsize <= 1024 * 1024 * 120) return 4096 * 65;
-	if ($fsize <= 1024 * 1024 * 150) return 4096 * 70;
-	if ($fsize <= 1024 * 1024 * 200) return 4096 * 85;
-	if ($fsize <= 1024 * 1024 * 250) return 4096 * 100;
-	if ($fsize <= 1024 * 1024 * 300) return 4096 * 115;
-	if ($fsize <= 1024 * 1024 * 400) return 4096 * 135;
-	if ($fsize <= 1024 * 1024 * 500) return 4096 * 170;
-	if ($fsize <= 1024 * 1024 * 1000) return 4096 * 200;
-	return 4096 * 210;
+	if ($fsize <= 0) return 65536;         // 64KB default for unknown size
+	if ($fsize < 65536) return intval($fsize);
+	if ($fsize <= 1024 * 1024) return 65536;              // 64KB for < 1MB
+	if ($fsize <= 1024 * 1024 * 10) return 131072;        // 128KB for < 10MB
+	if ($fsize <= 1024 * 1024 * 50) return 262144;        // 256KB for < 50MB
+	if ($fsize <= 1024 * 1024 * 100) return 524288;       // 512KB for < 100MB
+	if ($fsize <= 1024 * 1024 * 500) return 1048576;      // 1MB for < 500MB
+	if ($fsize <= 1024 * 1024 * 1024) return 2097152;     // 2MB for < 1GB
+	return 4194304;                                        // 4MB for 1GB+
 }
 
 function upfile($host, $port, $url, $referer, $cookie, $post, $file, $filename, $fieldname, $field2name = '', $proxy = 0, $pauth = 0, $upagent = 0, $scheme = 'http') {
