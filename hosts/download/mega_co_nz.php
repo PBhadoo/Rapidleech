@@ -8,13 +8,27 @@ class mega_co_nz extends DownloadClass {
 	private $useOpenSSL, $useOldFilter, $seqno, $cookie;
 	public function Download($link) {
 		$this->checkCryptDependences();
-		$this->checkBug78902($link);
 
 		$this->seqno = mt_rand();
-		$this->changeMesg(lang(300).'<br />Mega.co.nz plugin by Th3-822'); // Please, do not remove or change this line contents. - Th3-822
+		$this->changeMesg(lang(300).'<br />Mega.nz plugin');
 
-		if (preg_match('@F!?([^!]{8})[!#]([\w\-\,]{22})(?:!([^!#]{8}))?(!less$)?@i', $link, $fid)) return $this->Folder($fid[1], $fid[2], (!empty($fid[3]) && $fid[3] != $fid[1] ? $fid[3] : 0), (empty($fid[4]) ? 1 : 0));
-		if (!preg_match('@(T8|N)?!?([^!]{8})[!#]([\w\-\,]{43})(?:(?:!|=###n=)([^!#]{8})(?:!|$))?@i', $link, $fid)) html_error('FileID or Key not found at link.');
+		// New format: mega.nz/folder/ID#KEY or mega.nz/folder/ID#KEY/subfolder/SUBID
+		if (preg_match('@mega\.(?:nz|co\.nz)/folder/([^#]{8})[#!]([\w\-\,]{22})(?:/folder/([^#]{8}))?(!less$)?@i', $link, $fid)) {
+			return $this->Folder($fid[1], $fid[2], (!empty($fid[3]) ? $fid[3] : 0), (empty($fid[4]) ? 1 : 0));
+		}
+		// Old format: mega.nz/#F!ID!KEY
+		if (preg_match('@[#!]F!?([^!]{8})[!#]([\w\-\,]{22})(?:!([^!#]{8}))?(!less$)?@i', $link, $fid)) {
+			return $this->Folder($fid[1], $fid[2], (!empty($fid[3]) && $fid[3] != $fid[1] ? $fid[3] : 0), (empty($fid[4]) ? 1 : 0));
+		}
+
+		// New format: mega.nz/file/ID#KEY
+		if (preg_match('@mega\.(?:nz|co\.nz)/file/([^#]{8})[#!]([\w\-\,]{43})@i', $link, $fid)) {
+			$fid = array($link, '', $fid[1], $fid[2]);
+		}
+		// Old format: mega.nz/#!ID!KEY or mega.nz/#N!ID!KEY
+		elseif (!preg_match('@(T8|N)?!?([^!]{8})[!#]([\w\-\,]{43})(?:(?:!|=###n=)([^!#]{8})(?:!|$))?@i', $link, $fid)) {
+			html_error('FileID or Key not found at link. Supported formats:<br>mega.nz/file/ID#KEY<br>mega.nz/folder/ID#KEY<br>mega.nz/#!ID!KEY');
+		}
 
 		$pA = (empty($_REQUEST['premium_user']) || empty($_REQUEST['premium_pass']) ? false : true);
 		if (!empty($_REQUEST['premium_acc']) && $_REQUEST['premium_acc'] == 'on' && ($pA || (!empty($GLOBALS['premium_acc']['mega_co_nz']['user']) && !empty($GLOBALS['premium_acc']['mega_co_nz']['pass'])))) {
