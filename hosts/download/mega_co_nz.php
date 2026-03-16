@@ -8,6 +8,7 @@ class mega_co_nz extends DownloadClass {
 	private $useOpenSSL, $useOldFilter, $seqno, $cookie;
 	public function Download($link) {
 		$this->checkCryptDependences();
+		$this->checkMegaQueue($link);
 
 		$this->seqno = mt_rand();
 		$this->changeMesg(lang(300).'<br />Mega.nz plugin');
@@ -92,6 +93,109 @@ class mega_co_nz extends DownloadClass {
 			echo "\t<div><br /><input type='submit' value='Continue' /></div></form>\n";
 			include(TEMPLATE_DIR.'footer.php');
 			exit();
+		}
+	}
+
+	// ============================================
+	// MEGA DOWNLOAD QUEUE: Only 1 Mega download at a time
+	// Uses a lock file to prevent concurrent downloads
+	// ============================================
+	private function checkMegaQueue($link) {
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		$maxWait = 600; // Max 10 minutes wait
+		$staleTimeout = 300; // Consider lock stale after 5 minutes of no update
+
+		// If no lock exists, we're first - create it and proceed
+		if (!file_exists($lockFile)) {
+			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
+			// Register cleanup on shutdown
+			register_shutdown_function(array($this, 'releaseMegaLock'));
+			return;
+		}
+
+		// Lock exists - check if it's stale
+		$lockData = @json_decode(@file_get_contents($lockFile), true);
+		if (!$lockData || (time() - $lockData['time']) > $staleTimeout) {
+			// Stale lock - remove and take over
+			@unlink($lockFile);
+			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
+			register_shutdown_function(array($this, 'releaseMegaLock'));
+			return;
+		}
+
+		// Another download is active - show queue page with auto-retry
+		$waited = 0;
+		$retryInterval = 5; // Check every 5 seconds
+		$form = $this->DefaultParamArr($link);
+
+		echo '<div style="text-align:center; padding:20px;">';
+		echo '<h3 style="color:var(--fl-accent,#6366f1);">⏳ Mega Download Queue</h3>';
+		echo '<p>Another Mega download is currently in progress.</p>';
+		echo '<p>Your download will start automatically when the current one finishes.</p>';
+		echo '<p style="font-size:13px; color:var(--fl-text-3,#888);">Currently downloading: <b>' . htmlspecialchars($lockData['link'] ?? 'unknown') . '...</b></p>';
+		echo '<div id="mega_queue_status" style="margin:20px 0; padding:15px; background:var(--fl-surface-alt,#1e2231); border-radius:12px;">';
+		echo '<span id="mega_queue_msg">Waiting in queue... Checking every ' . $retryInterval . ' seconds.</span>';
+		echo '</div>';
+		echo '</div>';
+
+		echo "\n<form name='mega_queue_form' action='{$_SERVER['SCRIPT_NAME']}' method='POST' style='display:none;'>\n";
+		foreach ($form as $name => $input) echo "<input type='hidden' name='$name' value='" . htmlspecialchars($input, ENT_QUOTES) . "' />\n";
+		echo "</form>\n";
+
+		echo "<script type='text/javascript'>
+		var mqRetries = 0;
+		var mqMax = " . intval($maxWait / $retryInterval) . ";
+		function mqCheck() {
+			mqRetries++;
+			document.getElementById('mega_queue_msg').innerHTML = 'Waiting in queue... Attempt ' + mqRetries + '/' + mqMax + ' (auto-retry in {$retryInterval}s)';
+			if (mqRetries >= mqMax) {
+				document.getElementById('mega_queue_msg').innerHTML = 'Queue timeout. <a href=\"javascript:document.mega_queue_form.submit();\">Click to retry</a>';
+				return;
+			}
+			// Use AJAX to check if lock is released
+			var xhr = new XMLHttpRequest();
+			xhr.open('GET', 'ajax.php?ajax=mega_queue_check&t=' + Date.now(), true);
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState == 4 && xhr.status == 200) {
+					if (xhr.responseText.indexOf('free') !== -1) {
+						document.getElementById('mega_queue_msg').innerHTML = '<b>Queue is free! Starting download...</b>';
+						document.mega_queue_form.submit();
+					} else {
+						setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
+					}
+				} else if (xhr.readyState == 4) {
+					setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
+				}
+			};
+			xhr.send();
+		}
+		setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
+		</script>";
+
+		include(TEMPLATE_DIR.'footer.php');
+		exit();
+	}
+
+	public function releaseMegaLock() {
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		if (file_exists($lockFile)) {
+			$lockData = @json_decode(@file_get_contents($lockFile), true);
+			// Only remove if it's our lock
+			if (!$lockData || $lockData['pid'] == getmypid()) {
+				@unlink($lockFile);
+			}
+		}
+	}
+
+	// Keep the lock file timestamp fresh during download
+	public function touchMegaLock() {
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		if (file_exists($lockFile)) {
+			$lockData = @json_decode(@file_get_contents($lockFile), true);
+			if ($lockData && $lockData['pid'] == getmypid()) {
+				$lockData['time'] = time();
+				@file_put_contents($lockFile, json_encode($lockData), LOCK_EX);
+			}
 		}
 	}
 

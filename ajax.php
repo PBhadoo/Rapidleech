@@ -26,6 +26,20 @@ switch ($_GET['ajax']) {
 			echo array_to_json($AjaxReturn);
 		}
 		break;
+	case 'mega_queue_check':
+		if (!defined('DOWNLOAD_DIR')) define('DOWNLOAD_DIR', $options['download_dir']);
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		if (!file_exists($lockFile)) {
+			echo 'free';
+		} else {
+			$lockData = @json_decode(@file_get_contents($lockFile), true);
+			if (!$lockData || (time() - $lockData['time']) > 300) {
+				echo 'free';
+			} else {
+				echo 'busy';
+			}
+		}
+		break;
 	case 'pending_downloads':
 		require_once(CLASS_DIR . 'download_tracker.php');
 		$downloads = get_active_downloads();
