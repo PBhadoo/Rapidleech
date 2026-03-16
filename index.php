@@ -314,7 +314,7 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		echo sprintf(lang(10), link_for_file($file['file']), $file['size'], $file['time'], $file['speed']);
 		$file['date'] = time();
 
-		if (!write_file(CONFIG_DIR . 'files.lst', serialize(array('name' => $file['file'], 'size' => $file['size'], 'date' => $file['date'], 'link' => $_GET['link'], 'comment' => (!empty($_GET['comment']) ? str_replace(array("\r", "\n"), array('\r', '\n'), $_GET['comment']) : ''))) . "\r\n", 0)) echo lang(9) . '<br />';
+		if (!write_file(CONFIG_DIR . 'files.lst', serialize(array('name' => $file['file'], 'size' => $file['size'], 'date' => $file['date'], 'link' => $_GET['link'], 'comment' => (!empty($_GET['comment']) ? str_replace(array("\r", "\n"), array('\r', '\n'), $_GET['comment']) : ''), 'owner' => (defined('USER_TOKEN') ? USER_TOKEN : ''))) . "\r\n", 0)) echo lang(9) . '<br />';
 
 		if (!empty($_GET['email']) && !$options['disable_email']) {
 			require_once(CLASS_DIR . 'mail.php');

@@ -46,6 +46,24 @@ header('Pragma: no-cache');
 require_once(CLASS_DIR . 'other.php');
 
 // ============================================
+// USER TOKEN: Cookie-based file ownership
+// Each browser gets a unique token. Files are tagged with
+// the owner's token so users only see their own files.
+// ============================================
+function get_user_token() {
+    if (!empty($_COOKIE['rl_user_token']) && preg_match('/^[a-f0-9]{32}$/', $_COOKIE['rl_user_token'])) {
+        return $_COOKIE['rl_user_token'];
+    }
+    $token = md5(uniqid(mt_rand(), true) . ($_SERVER['REMOTE_ADDR'] ?? '') . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+    // Set cookie for 1 year, httponly
+    @setcookie('rl_user_token', $token, time() + 365 * 86400, '/', '', false, true);
+    $_COOKIE['rl_user_token'] = $token;
+    return $token;
+}
+// Initialize the user token on every request
+define('USER_TOKEN', get_user_token());
+
+// ============================================
 // FAILSAFE: Auto-cleanup when storage hits 99%
 // ============================================
 function check_storage_and_cleanup() {
