@@ -30,6 +30,7 @@ class mega_co_nz extends DownloadClass {
 			html_error('FileID or Key not found at link. Supported formats:<br>mega.nz/file/ID#KEY<br>mega.nz/folder/ID#KEY<br>mega.nz/#!ID!KEY');
 		}
 
+		// Load premium account credentials if available
 		$pA = (empty($_REQUEST['premium_user']) || empty($_REQUEST['premium_pass']) ? false : true);
 		if (!empty($_REQUEST['premium_acc']) && $_REQUEST['premium_acc'] == 'on' && ($pA || (!empty($GLOBALS['premium_acc']['mega_co_nz']['user']) && !empty($GLOBALS['premium_acc']['mega_co_nz']['pass'])))) {
 			$user = ($pA ? $_REQUEST['premium_user'] : $GLOBALS['premium_acc']['mega_co_nz']['user']);
@@ -40,13 +41,21 @@ class mega_co_nz extends DownloadClass {
 				unset($_POST['pA_encrypted']);
 			}
 		}
+		// Also check server-side accounts even without premium_acc checkbox
+		if (empty($user) && !empty($GLOBALS['premium_acc']['mega_co_nz']['user']) && !empty($GLOBALS['premium_acc']['mega_co_nz']['pass'])) {
+			$user = $GLOBALS['premium_acc']['mega_co_nz']['user'];
+			$pass = $GLOBALS['premium_acc']['mega_co_nz']['pass'];
+		}
 
-		do {
-			$reply = $this->apiReq(array('a' => 'g', 'g' => 1, (empty($fid[1]) ? 'p' : 'n') => $fid[2], 'ssl' => 0), (!empty($fid[1]) && !empty($fid[4]) ? $fid[4] : ''));
-			if (is_numeric($reply[0])) $this->CheckErr($reply[0]);
-			if (!empty($reply[0]['e']) && is_numeric($reply[0]['e'])) $this->CheckErr($reply[0]['e']);
-			$tLimit = $this->checkTrafficLimit($reply[0]['g']);
-		} while (!empty($user) && !empty($pass) && empty($this->cookie['sid']) && $tLimit && $this->cJar_load($user, $pass));
+		// If we have credentials, login FIRST before requesting download link
+		if (!empty($user) && !empty($pass) && empty($this->cookie['sid'])) {
+			$this->cJar_load($user, $pass);
+		}
+
+		$reply = $this->apiReq(array('a' => 'g', 'g' => 1, (empty($fid[1]) ? 'p' : 'n') => $fid[2], 'ssl' => 0), (!empty($fid[1]) && !empty($fid[4]) ? $fid[4] : ''));
+		if (is_numeric($reply[0])) $this->CheckErr($reply[0]);
+		if (!empty($reply[0]['e']) && is_numeric($reply[0]['e'])) $this->CheckErr($reply[0]['e']);
+		$tLimit = $this->checkTrafficLimit($reply[0]['g']);
 
 		if ($tLimit) {
 			$debugInfo = '';
