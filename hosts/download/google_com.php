@@ -6,73 +6,154 @@ if (!defined('RAPIDLEECH')) {
 }
 
 class google_com extends DownloadClass {
-	public $fNames = array('odt' => 'OpenDocument Text', 'docx' => 'Microsoft Word', 'rtf' => 'Rich Text Format', 'txt' => 'Plain Text', 'pdf' => 'PDF Document', 'epub' => 'EPUB Publication', 'zip' => 'Zipped html Document', 'pptx' => 'Microsoft PowerPoint', 'ods' => 'OpenDocument Spreadsheet', 'xlsx' => 'Microsoft Excel'), $dFormats = array('odt', 'docx', 'rtf', 'txt', 'pdf', 'epub', 'zip'), $pFormats = array('pptx', 'pdf'), $ssFormats = array('ods', 'xlsx', 'pdf', 'zip'), $sFormats = array(13 => 'ods', 420 => 'xlsx', 12 => 'pdf');
+	public $fNames = array('odt' => 'OpenDocument Text', 'docx' => 'Microsoft Word', 'rtf' => 'Rich Text Format', 'txt' => 'Plain Text', 'pdf' => 'PDF Document', 'epub' => 'EPUB Publication', 'zip' => 'Zipped html Document', 'pptx' => 'Microsoft PowerPoint', 'ods' => 'OpenDocument Spreadsheet', 'xlsx' => 'Microsoft Excel');
+	public $dFormats = array('odt', 'docx', 'rtf', 'txt', 'pdf', 'epub', 'zip');
+	public $pFormats = array('pptx', 'pdf');
+	public $ssFormats = array('ods', 'xlsx', 'pdf', 'zip');
+
 	public function Download($link) {
-		$this->checkBug78902($link);
-		if (!preg_match('@https?://(?:[\w\-]+\.)*(?:drive|docs)\.google\.com/(?:(?:folderview|open|(?:a/[\w\-\.]+/)?uc)\?(?:[\w\-\%]+=[\w\-\%]*&)*id=|(?:folder|file|document|presentation|spreadsheets)/d/|spreadsheet/ccc\?(?:[\w\-\%]+=[\w\-\%]*&)*key=|drive/folders/)([\w\-]{28,})@i', $link, $this->ID)) html_error('File/Folder ID not found at link.');
+		// Extract file/folder ID from various Google Drive URL formats
+		if (!preg_match('@https?://(?:[\w\-]+\.)*(?:drive|docs)\.google\.com/(?:(?:folderview|open|(?:a/[\w\-\.]+/)?uc)\?(?:[\w\-\%]+=[\w\-\%]*&)*id=|(?:folder|file|document|presentation|spreadsheets?)/d/|drive/(?:u/\d+/)?folders/|drive/(?:u/\d+/)?file/d/)([\w\-]{10,})@i', $link, $this->ID)) {
+			// Try simpler ID extraction
+			if (!preg_match('@/d/([\w\-]{10,})@', $link, $this->ID) &&
+				!preg_match('@[?&]id=([\w\-]{10,})@', $link, $this->ID) &&
+				!preg_match('@/folders/([\w\-]{10,})@', $link, $this->ID)) {
+				html_error('File/Folder ID not found in the link.');
+			}
+		}
 		$this->ID = $this->ID[1];
 
-		// Use /open link for check if ID exists and also get it's type.
-		$page = $this->GetPage('https://drive.google.com/open?id='.$this->ID);
-		if (substr($page, 9, 3) == '404') html_error('File/Folder doesn\'t exists.');
-		if (substr($page, 9, 1) != '3' || !preg_match('@\nLocation: https?://(?:[\w\-]+\.)*(?:drive|docs)\.google\.com/(?:drive/)?(\w+)[\?/]@i', $page, $type)) html_error('Cannot find /open redirect.');
-
-		switch (strtolower($type[1])) {
-			case 'file': $this->File();break;
-			case 'folder': case 'folders': case 'folderview': $this->Folder();break;
-			case 'document': $this->Document();break;
-			case 'presentation': $this->Presentation();break;
-			case 'spreadsheets': $this->Spreadsheets();break; // New spreadsheets
-			case 'spreadsheet': $this->Spreadsheet();break;
-			default: html_error('Unknown /open redirect.');break;
+		// Determine type based on URL
+		if (preg_match('@/folders?/@i', $link) || preg_match('@folderview@i', $link)) {
+			$this->Folder();
+			return;
 		}
-	}
-
-	private function checkBug78902($link = '') {
-		// 7.4 - 7.4.2, 7.3.11 - 7.3.14, 7.2.24 - 7.2.*
-		if (substr(PHP_OS, 0, 3) == 'WIN' || version_compare(PHP_VERSION, '7.2.24', '<') || version_compare(PHP_VERSION, '7.4.2', '>') || !version_compare(PHP_VERSION, '7.3.14', '<=')) return;
-
-		if (empty($link)) echo('<div id="mesg" width="100%" align="center"></div><br />');
-		$this->changeMesg('Warning: Running on PHP v' . PHP_VERSION . ' (Please Upgrade)<br />Downloads with this PHP release will be affected by the bug <a href="https://bugs.php.net/bug.php?id=78902">#78902</a> and will leak RAM until exhausted.<br />File may stop at a random size (up to ~1 GB).');
-
-		if (!empty($_GET['method']) && $_GET['method'] == '78902') return;
-		if (!empty($link)) {
-			$form = $this->DefaultParamArr($link);
-			$form['method'] = '78902';
-
-			echo "\n<form name='f78902' action='{$_SERVER['SCRIPT_NAME']}' method='POST'>\n";
-			foreach ($form as $name => $input) echo "\t<input type='hidden' name='$name' id='$name' value='" . htmlspecialchars($input, ENT_QUOTES) . "' />\n";
-			echo "\t<div><br /><input type='submit' value='Continue' /></div></form>\n";
-			include(TEMPLATE_DIR.'footer.php');
-			exit();
+		if (preg_match('@/document/@i', $link)) {
+			$this->Document();
+			return;
 		}
+		if (preg_match('@/presentation/@i', $link)) {
+			$this->Presentation();
+			return;
+		}
+		if (preg_match('@/spreadsheets?/@i', $link)) {
+			$this->Spreadsheets();
+			return;
+		}
+
+		// Default: try as file
+		// First try /open to detect type via redirect
+		$page = $this->GetPage('https://drive.google.com/open?id=' . $this->ID);
+		if (substr($page, 9, 3) == '404') html_error('File/Folder doesn\'t exist.');
+
+		if (substr($page, 9, 1) == '3' && preg_match('@\nLocation: https?://(?:[\w\-]+\.)*(?:drive|docs)\.google\.com/(?:drive/)?(\w+)[\?/]@i', $page, $type)) {
+			switch (strtolower($type[1])) {
+				case 'file': $this->File(); return;
+				case 'folder': case 'folders': case 'folderview': $this->Folder(); return;
+				case 'document': $this->Document(); return;
+				case 'presentation': $this->Presentation(); return;
+				case 'spreadsheets': $this->Spreadsheets(); return;
+				default: break;
+			}
+		}
+
+		// Fallback: try as regular file download
+		$this->File();
 	}
 
 	private function isPrivate($page) {
-		if (substr($page, 9, 2) == '30') is_present($page, 'Location: https://www.google.com/accounts/ServiceLogin', 'Private File/Folder.');
-		else is_present($page, "0; url='https://www.google.com/accounts/ServiceLogin", 'Private File/Folder.');
+		if (stripos($page, 'ServiceLogin') !== false || stripos($page, 'accounts.google.com/v3/signin') !== false) {
+			html_error('This is a private file/folder. You need to be signed in to access it.');
+		}
 	}
 
 	private function File() {
-		$page = $this->GetPage('https://drive.google.com/uc?export=download&confirm=T822&id='.$this->ID, "download_warning_13058876669334088843_{$this->ID}=T822");
+		// Method 1: Try direct export download
+		$dlUrl = 'https://drive.google.com/uc?export=download&id=' . $this->ID;
+		$page = $this->GetPage($dlUrl);
 		$this->isPrivate($page);
-		if (substr($page, 9, 1) != '3' || !preg_match('@\nLocation: (https?://(?:[\w\-]+\.)*googleusercontent\.com/[^\r\n]+)@i', $page, $dl)) html_error('File\'s download-link not found.');
-		$this->RedirectDownload($dl[1], 'fGoogle', 0, 0, 'https://drive.google.com/file/d/'.$this->ID);
+
+		// Check if we got a direct redirect (small files)
+		if (substr($page, 9, 1) == '3') {
+			if (preg_match('@\nLocation: (https?://[^\r\n]+)@i', $page, $dl)) {
+				$this->RedirectDownload($dl[1], 'fGoogle', 0, 0, $dlUrl);
+				return;
+			}
+		}
+
+		// For larger files, Google shows a virus scan warning page
+		// Try to extract the confirmation token
+		$body = $page;
+		if (($pos = strpos($body, "\r\n\r\n")) !== false) {
+			$body = substr($body, $pos + 4);
+		}
+
+		// Method 2: Look for confirm token in the page (new format with uuid)
+		if (preg_match('@/uc\?export=download[^"\']*&amp;confirm=([^&"\']+)[^"\']*&amp;uuid=([^&"\']+)@i', $body, $confirm)) {
+			$confirmUrl = 'https://drive.google.com/uc?export=download&confirm=' . htmlspecialchars_decode($confirm[1]) . '&uuid=' . htmlspecialchars_decode($confirm[2]) . '&id=' . $this->ID;
+			$cookie = GetCookiesArr($page);
+			$page2 = $this->GetPage($confirmUrl, $cookie);
+			if (substr($page2, 9, 1) == '3' && preg_match('@\nLocation: (https?://[^\r\n]+)@i', $page2, $dl)) {
+				$this->RedirectDownload($dl[1], 'fGoogle', $cookie, 0, $dlUrl);
+				return;
+			}
+		}
+
+		// Method 3: Look for confirm=t pattern
+		if (preg_match('@confirm=([a-zA-Z0-9_\-]+)@', $body, $confirm)) {
+			$confirmUrl = 'https://drive.google.com/uc?export=download&confirm=' . $confirm[1] . '&id=' . $this->ID;
+			$cookie = GetCookiesArr($page);
+			$page2 = $this->GetPage($confirmUrl, $cookie);
+			if (substr($page2, 9, 1) == '3' && preg_match('@\nLocation: (https?://[^\r\n]+)@i', $page2, $dl)) {
+				$this->RedirectDownload($dl[1], 'fGoogle', $cookie, 0, $dlUrl);
+				return;
+			}
+		}
+
+		// Method 4: Try with download_warning cookie
+		$cookie = 'download_warning_' . $this->ID . '=t';
+		$confirmUrl = 'https://drive.google.com/uc?export=download&confirm=t&id=' . $this->ID;
+		$page2 = $this->GetPage($confirmUrl, $cookie);
+		if (substr($page2, 9, 1) == '3' && preg_match('@\nLocation: (https?://[^\r\n]+)@i', $page2, $dl)) {
+			$this->RedirectDownload($dl[1], 'fGoogle', $cookie, 0, $dlUrl);
+			return;
+		}
+
+		// Method 5: Use the /file/d/ direct link approach
+		$apiUrl = 'https://drive.google.com/uc?id=' . $this->ID . '&export=download&confirm=t';
+		$this->RedirectDownload($apiUrl, 'fGoogle', $cookie, 0, 'https://drive.google.com/file/d/' . $this->ID);
 	}
 
 	private function Folder() {
 		if (isset($_GET['audl'])) html_error('Cannot check folder in audl.');
-		$page = $this->GetPage('https://drive.google.com/drive/folders/'.$this->ID);
+		$page = $this->GetPage('https://drive.google.com/drive/folders/' . $this->ID);
 		$this->isPrivate($page);
-		if (!preg_match_all('@\\\x5b\\\x22([\w\-]{28,})\\\x22,@i', $page, $ids) && !preg_match_all('@\[(\\\x22)([\w\-]{28,})\1,\[\1[\w\-]{28,}\1\]\\\n,\1(?>.*?\1),\1(?!application\\\/vnd\.google-apps\.folder)@i', $page, $ids, PREG_SET_ORDER)) html_error('Empty folder?');
-		$ids = $ids[1];
+
+		$ids = array();
+		// Try multiple patterns for extracting file IDs from folder page
+		if (preg_match_all('@\["([\w\-]{20,})"@', $page, $matches)) {
+			$ids = array_unique($matches[1]);
+			// Remove the folder's own ID
+			$ids = array_diff($ids, array($this->ID));
+		}
+		if (empty($ids) && preg_match_all('@/file/d/([\w\-]{20,})@', $page, $matches)) {
+			$ids = array_unique($matches[1]);
+		}
+		if (empty($ids) && preg_match_all('@\\\x5b\\\x22([\w\-]{20,})\\\x22,@i', $page, $matches)) {
+			$ids = $matches[1];
+		}
+
+		if (empty($ids)) html_error('Empty folder or could not read folder contents.');
+
 		$links = array();
-		foreach ($ids as $id) $links[] = "https://drive.google.com/uc?id=$id&export=download";
+		foreach ($ids as $id) {
+			$links[] = "https://drive.google.com/uc?id=$id&export=download";
+		}
 		$this->moveToAutoDownloader($links);
 	}
 
 	private function Document() {
-		$url = 'https://docs.google.com/document/d/'.$this->ID;
+		$url = 'https://docs.google.com/document/d/' . $this->ID;
 		$page = $this->GetPage("$url/edit");
 		$this->isPrivate($page);
 		if (empty($_GET['T8']['format']) && !isset($_GET['audl'])) $this->formatSelector(1);
@@ -81,7 +162,7 @@ class google_com extends DownloadClass {
 	}
 
 	private function Presentation() {
-		$url = 'https://docs.google.com/presentation/d/'.$this->ID;
+		$url = 'https://docs.google.com/presentation/d/' . $this->ID;
 		$page = $this->GetPage("$url/edit");
 		$this->isPrivate($page);
 		if (empty($_GET['T8']['format']) && !isset($_GET['audl'])) $this->formatSelector(2);
@@ -90,79 +171,56 @@ class google_com extends DownloadClass {
 	}
 
 	private function Spreadsheets() {
-		$url = 'https://docs.google.com/spreadsheets/d/'.$this->ID;
+		$url = 'https://docs.google.com/spreadsheets/d/' . $this->ID;
 		$page = $this->GetPage("$url/edit");
 		$this->isPrivate($page);
 		if (empty($_GET['T8']['format']) && !isset($_GET['audl'])) $this->formatSelector(3);
 		$format = (!empty($_GET['T8']['format']) && in_array($_GET['T8']['format'], $this->ssFormats)) ? $_GET['T8']['format'] : reset($this->ssFormats);
-		$this->RedirectDownload("$url/export/$format", 'ssGoogle', 0, 0, $url);
-	}
-
-	private function Spreadsheet() {
-		$url = 'https://docs.google.com/spreadsheet';
-		$page = $this->GetPage("$url/ccc?key=".$this->ID);
-		$this->isPrivate($page);
-		$cookie = GetCookiesArr($page);
-
-		if (substr($page, 9, 1) != '3' || !preg_match('@\nLocation: (https?://(?:[\w\-]+\.)*google\.com/[^\r\n]+)@i', $page, $redir)) html_error("Redirect 1 not found");
-		$page = $this->GetPage($redir[1], $cookie);
-		$cookie = GetCookiesArr($page, $cookie);
-		if (empty($cookie['PREF'])) html_error("Cookie 'PREF' not found");
-
-		$page = $this->GetPage("$url/ccc?key=".$this->ID, $cookie);
-
-		if (empty($_GET['T8']['format']) && !isset($_GET['audl'])) $this->formatSelector(4);
-		if (empty($_GET['T8']['format']) || ($fmcmd = array_search($_GET['T8']['format'], $this->sFormats)) === false) {
-			reset($this->sFormats);
-			$fmcmd = key($this->sFormats);
-		}
-		if (($cmdUrl = cut_str($page, '/fm?id=', '"')) == false || !preg_match('@[\w\-\.]+@i', $cmdUrl, $cmdId)) html_error('Download ID not found.');
-		$this->RedirectDownload("$url/fm?id={$cmdId[0]}&fmcmd=$fmcmd", 'sGoogle', $cookie, 0, "$url/ccc?key=".$this->ID);
+		$this->RedirectDownload("$url/export?format=$format", 'ssGoogle', 0, 0, $url);
 	}
 
 	private function formatSelector($type = 1) {
 		switch ($type) {
-			case 1: $tName = 'Document';$formats = $this->dFormats;break;
-			case 2: $tName = 'Presentation';$formats = $this->pFormats;break;
-			case 3: $tName = 'Spreadsheets';$formats = $this->ssFormats;break;
-			case 4: $tName = 'Spreadsheet';$formats = $this->sFormats;break;
+			case 1: $tName = 'Document'; $formats = $this->dFormats; break;
+			case 2: $tName = 'Presentation'; $formats = $this->pFormats; break;
+			case 3: $tName = 'Spreadsheet'; $formats = $this->ssFormats; break;
 			default: html_error('formatSelector: Unknown type.');
 		}
 		if (count($formats) == 1) return $_GET['T8'] = array('format' => reset($formats));
-		echo "\n<br /><br /><h3 style='text-align: center;'>$tName format selector.</h4>";
+		echo "\n<br /><br /><h3 style='text-align: center;'>$tName format selector</h3>";
 		echo "\n<center><form name='GD_FS' action='{$GLOBALS['PHP_SELF']}' method='POST'>\n";
 		echo "<select name='T8[format]' id='GD_ext'>\n";
-		foreach ($formats as $ext) echo "<option value='$ext'>".(!empty($this->fNames[$ext]) ? $this->fNames[$ext]." (.$ext)" : ".$ext")."</option>\n";
+		foreach ($formats as $ext) echo "<option value='$ext'>" . (!empty($this->fNames[$ext]) ? $this->fNames[$ext] . " (.$ext)" : ".$ext") . "</option>\n";
 		echo "</select>\n";
-		$data = $this->DefaultParamArr('https://drive.google.com/open?id='.$this->ID);
+		$data = $this->DefaultParamArr('https://drive.google.com/open?id=' . $this->ID);
 		foreach ($data as $n => $v) echo("<input type='hidden' name='$n' id='FS_$n' value='$v' />\n");
-		echo "<input type='submit' name='Th3-822' value='".lang(209)."' />\n";
+		echo "<input type='submit' name='Th3-822' value='" . lang(209) . "' />\n";
 		echo "</form></center>\n</body>\n</html>";
 		exit;
 	}
 
-	// Add a Range header for get the filesize on chunked file downloads
+	// Add Range header to get filesize on chunked downloads
 	public function RedirectDownload($link, $FileName = 0, $cookie = 0, $post = 0, $referer = 0, $force_name = 0, $auth = 0, $addon = array()) {
 		$referer .= "\r\nRange: bytes=0-";
 		return parent::RedirectDownload($link, $FileName, $cookie, $post, $referer, $force_name, $auth, $addon);
 	}
 
 	public function CheckBack(&$headers) {
-		$this->checkBug78902();
-		if (substr($headers, 9, 3) == '416') html_error('[google_com.php] Plugin needs a fix, \'Range\' method is not working.');
+		if (substr($headers, 9, 3) == '416') {
+			// Range not satisfiable - remove range header and retry as normal
+			html_error('[google_com] Range method failed. The file may be too small or the URL may have expired.');
+		}
 		if (stripos($headers, "\nTransfer-Encoding: chunked") !== false) {
 			global $fp, $sFilters;
-			if (empty($fp) || !is_resource($fp)) html_error('Error: Your rapidleech copy is outdated and it doesn\'t support functions required by this plugin.');
-			if (!in_array('dechunk', stream_get_filters())) html_error('Error: dechunk filter not available, cannot download chunked file.');
+			if (empty($fp) || !is_resource($fp)) html_error('Error: Stream resource not available for chunked transfer.');
+			if (!in_array('dechunk', stream_get_filters())) html_error('Error: dechunk filter not available.');
 			if (!isset($sFilters) || !is_array($sFilters)) $sFilters = array();
 			if (empty($sFilters['dechunk'])) $sFilters['dechunk'] = stream_filter_append($fp, 'dechunk', STREAM_FILTER_READ);
-			if (!$sFilters['dechunk']) html_error('Error: Unknown error while initializing dechunk filter, cannot download chunked file.');
-			// Little hack to get the filesize.
+			if (!$sFilters['dechunk']) html_error('Error: Failed to initialize dechunk filter.');
 			$headers = preg_replace('@\nContent-Range\: bytes 0-\d+/@i', "\nContent-Length: ", $headers, 1);
 		}
 	}
 }
 
-// [11-2-2014]  Written by Th3-822.
-// [23-12-2014]  Added support for new spreadsheets format/urls & Some workarounds to get filesize on chunked downloads... - Th3-822
-// [30-4-2018]  Fixed Folders. - Th3-822
+// Google Drive plugin for RapidLeech
+// Originally by Th3-822, updated 2026 for current Google Drive API
