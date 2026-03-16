@@ -92,16 +92,20 @@ $insgesamt = disk_total_space ( "./" );
 $belegt = $insgesamt - $frei;
 $prozent_belegt = 100 * $belegt / $insgesamt;
 	if ($os == "windows") {
-		$wmi = new COM ( "Winmgmts://" );
-		$cpus = $wmi->execquery ( "SELECT * FROM Win32_Processor" );
-		$cpu_string = lang(136).':';
-		$cpu_load = 0;
-		foreach ( $cpus as $cpu ) {
-			$cpu_load += $cpu->loadpercentage;
-			$cpu_string .= "" . $cpu->loadpercentage;
+		if (class_exists('COM')) {
+			$wmi = new COM ( "Winmgmts://" );
+			$cpus = $wmi->execquery ( "SELECT * FROM Win32_Processor" );
+			$cpu_string = lang(136).':';
+			$cpu_load = 0;
+			foreach ( $cpus as $cpu ) {
+				$cpu_load += $cpu->loadpercentage;
+				$cpu_string .= "" . $cpu->loadpercentage;
+			}
+			$cpu_load /= (is_array($cpus) ? count($cpus) : 1);
+			$cpu_string .= '%<br /><img src="' . CLASS_DIR . 'bar.php?rating=' . round ( $cpu_load, "2" ) . '" border="0" /><br />';
+		} else {
+			$cpu_string = lang(136).': ' . lang(137) . '<br />';
 		}
-		$cpu_load /= (is_array($cpus) ? count($cpus) : 1);
-		$cpu_string .= '%<br /><img src="' . CLASS_DIR . 'bar.php?rating=' . round ( $cpu_load, "2" ) . '" border="0" /><br />';
 	} elseif ($os == "linux") {
 		function getStat($_statPath) {
 			if (trim ( $_statPath ) == '') {
