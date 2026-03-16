@@ -1,0 +1,13 @@
+# Git
+.git
+.gitattributes
+
+# RAR binaries (not needed on Vercel serverless)
+rar/
+
+# Shell scripts
+rapidleech.sh
+
+# Docs
+rev.History.txt
+README.md

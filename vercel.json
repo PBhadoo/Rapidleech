@@ -1,0 +1,106 @@
+{
+  "builds": [
+    {
+      "src": "index.php",
+      "use": "vercel-php@0.7.2"
+    },
+    {
+      "src": "ajax.php",
+      "use": "vercel-php@0.7.2"
+    },
+    {
+      "src": "audl.php",
+      "use": "vercel-php@0.7.2"
+    },
+    {
+      "src": "auul.php",
+      "use": "vercel-php@0.7.2"
+    },
+    {
+      "src": "upload.php",
+      "use": "vercel-php@0.7.2"
+    },
+    {
+      "src": "notes.php",
+      "use": "vercel-php@0.7.2"
+    },
+    {
+      "src": "deny.php",
+      "use": "vercel-php@0.7.2"
+    },
+    {
+      "src": "checker.php",
+      "use": "vercel-php@0.7.2"
+    },
+    {
+      "src": "templates/**/*.{css,gif,png,jpg,jpeg,svg,ico}",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "classes/**/*.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "ads.txt",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "arc-sw.js",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/templates/(.*\\.css)",
+      "dest": "/templates/$1"
+    },
+    {
+      "src": "/templates/(.*\\.(gif|png|jpg|jpeg|svg|ico))",
+      "dest": "/templates/$1"
+    },
+    {
+      "src": "/classes/(.*\\.js)",
+      "dest": "/classes/$1"
+    },
+    {
+      "src": "/ads\\.txt",
+      "dest": "/ads.txt"
+    },
+    {
+      "src": "/arc-sw\\.js",
+      "dest": "/arc-sw.js"
+    },
+    {
+      "src": "/ajax\\.php(.*)",
+      "dest": "/ajax.php$1"
+    },
+    {
+      "src": "/audl\\.php(.*)",
+      "dest": "/audl.php$1"
+    },
+    {
+      "src": "/auul\\.php(.*)",
+      "dest": "/auul.php$1"
+    },
+    {
+      "src": "/upload\\.php(.*)",
+      "dest": "/upload.php$1"
+    },
+    {
+      "src": "/notes\\.php(.*)",
+      "dest": "/notes.php$1"
+    },
+    {
+      "src": "/deny\\.php(.*)",
+      "dest": "/deny.php$1"
+    },
+    {
+      "src": "/checker\\.php(.*)",
+      "dest": "/checker.php$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.php"
+    }
+  ]
+}
