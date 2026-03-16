@@ -175,9 +175,12 @@ function sec2time($time) {
 // Updated function to be able to format up to Yotabytes!
 function bytesToKbOrMbOrGb($bytes) {
 	if (is_numeric($bytes)) {
+		if ($bytes <= 0) return '0 B';
 		$s = array('B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB');
 		$e = floor(log($bytes) / log(1024));
-		return sprintf('%.2f ' . $s[$e], @($bytes / pow(1024, floor($e))));
+		if ($e < 0) $e = 0;
+		if ($e >= count($s)) $e = count($s) - 1;
+		return sprintf('%.2f ' . $s[$e], ($bytes / pow(1024, $e)));
 	} else $size = 'Unknown';
 	return $size;
 }
