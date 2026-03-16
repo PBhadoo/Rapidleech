@@ -2,6 +2,8 @@
 
 Build and Edited from https://github.com/Th3-822/rapidleech
 
+**Live Server:** [https://hashhackers.apranet.eu.org](https://hashhackers.apranet.eu.org)
+
 #### Quick Install (Ubuntu 22.04 / 24.04)
 
 ```bash
@@ -40,6 +42,12 @@ $premium_acc["rapidgator_net"] = array('user' => 'username', 'pass' => 'password
 
 Supported premium services: Mega.nz, 1Fichier, 4Shared, Alfafile, FileFactory, Filejoker, Keep2Share, Mediafire, Nitroflare, Rapidgator, Turbobit, and more.
 
+#### Admin Panel
+
+Access at `/admin` (default credentials: admin/admin — change in `admin/index.php`).
+
+Features: Server status, clear all files, edit premium accounts, one-click GitHub update, shell command runner.
+
 #### Features
 
 - 🎨 **Two Templates** — "Flavor" (modern dark/light) and "PlugMod" (classic)
@@ -48,6 +56,7 @@ Supported premium services: Mega.nz, 1Fichier, 4Shared, Alfafile, FileFactory, F
 - 📊 **Download Tracking** — Real-time progress, pending downloads tab
 - ⚡ **Auto Transload** — Batch download multiple links
 - 🧹 **Auto Cleanup** — Configurable auto-delete timer + 99% storage failsafe
+- 🛡️ **Mega Queue** — Only 1 Mega download at a time to prevent account abuse
 
 #### Templates
 
@@ -56,12 +65,6 @@ Switch templates in `configs/config.php`:
 'template_used' => 'flavor',   // Modern UI (default)
 'template_used' => 'plugmod',  // Classic UI
 ```
-
-#### Deploy to Vercel (Testing Only)
-
-> Vercel deployment is for **UI testing only**. File downloads don't work on serverless.
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Ftemp-deployers%2FRapidleech)
 
 #### Update Existing Installation
 
@@ -75,5 +78,7 @@ cp configs/config.php.bak configs/config.php
 rm -f files/mega_dl.php
 chmod -R 777 files/ configs/
 ```
+
+Or use the Admin Panel at `/admin` → "Update from GitHub" button.
 
 ### Make pull requests for changes or fixes.
