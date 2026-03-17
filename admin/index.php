@@ -159,11 +159,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $verNum = str_replace('.', '', $latestVer);
             $tarball = "rarlinux-x64-{$verNum}.tar.gz";
             $url = "https://www.rarlab.com/rar/$tarball";
-            $cmd = "cd $rootDir && rm -rf rar && wget -q '$url' && tar -xf '$tarball' && rm -f '$tarball' && chmod -R 777 rar 2>&1";
+            $cmd = "cd $rootDir && rm -rf rar && wget '$url' -O '$tarball' 2>&1 && tar -xf '$tarball' 2>&1 && rm -f '$tarball' && chmod -R 777 rar && echo 'Done.' && rar/rar 2>&1 | head -2";
             $output = shell_exec($cmd);
             $newVer = getInstalledRarVersion($rootDir);
-            $message = "RAR updated to version $newVer.";
-            $messageType = 'success';
+            if ($newVer === 'Unknown' || $newVer === 'Not installed') {
+                $message = "RAR update may have failed. Check output below.";
+                $messageType = 'error';
+            } else {
+                $message = "RAR updated to version $newVer.";
+                $messageType = 'success';
+            }
             break;
     }
 }
