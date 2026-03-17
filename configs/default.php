@@ -59,14 +59,18 @@ $default_options = array(
 'no_cache' => true, # true - Prohibition by Browser; otherwise allowed
 'ref_check' => true, # true - Disallow downloads from external referers. In some hosts this check may give false positives, disable if it doesn't let you download.
 '2gb_fix' => true, # true - Try to list files bigger than 2gb on 32 bit o.s.
-'forbidden_filetypes' => array('.htaccess', '.htpasswd', '.php', '.php3', '.php4', '.php5', '.phtml', '.asp', '.aspx', '.cgi'), # Enter the forbidden filetypes in the given way
-'forbidden_filetypes_block' => false, # false - rename forbidden_filetypes, true - completely block them
+'forbidden_filetypes' => array('.htaccess', '.htpasswd', '.php', '.php3', '.php4', '.php5', '.phtml', '.asp', '.aspx', '.cgi', '.bin', '.exe', '.msi', '.bat', '.cmd', '.com', '.scr', '.pif', '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh', '.ps1', '.psm1', '.sh', '.bash', '.dll', '.sys', '.drv', '.ocx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.tiff', '.tif', '.svg', '.webp', '.heic', '.heif'), # Enter the forbidden filetypes in the given way
+'forbidden_filetypes_block' => true, # false - rename forbidden_filetypes, true - completely block them
 'rename_these_filetypes_to' => '.xxx', # If forbidden_filetypes_block = false then rename those filetypes to this
 'check_these_before_unzipping' => true, # true - Don't allow extraction/creation of these filetypes from file actions
+'require_content_length' => true, # true - Block downloads that don't provide Content-Length header
 'fgc' => 0,
 //Parallel Download
 'parallel_download' => true, # true - Enable parallel chunk download for resumable links (like IDM)
-'parallel_chunks' => 8 # Number of chunks to split file into for parallel download
+'parallel_chunks' => 8, # Number of chunks to split file into for parallel download
+//Admin Panel
+'admin_user' => 'admin', # Admin panel username
+'admin_pass' => 'admin' # Admin panel password
 );
 /*Default Options End*/
 ?>
