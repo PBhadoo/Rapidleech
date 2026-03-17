@@ -20,6 +20,41 @@ if (empty($_SERVER['PHP_AUTH_USER']) || $_SERVER['PHP_AUTH_USER'] !== $ADMIN_USE
 
 $filesDir = $rootDir . '/files';
 $accountsFile = $configDir . '/accounts.php';
+$configFile = $configDir . '/config.php';
+
+// Helper: Get installed RAR version
+function getInstalledRarVersion($rootDir) {
+    $rarExec = $rootDir . '/rar/rar';
+    if (!file_exists($rarExec)) {
+        $rarExec = $rootDir . '/rar/unrar';
+    }
+    if (!file_exists($rarExec)) return 'Not installed';
+    $out = @shell_exec(escapeshellarg($rarExec) . ' 2>&1 | head -1');
+    if ($out && preg_match('/(?:UNRAR|RAR)\s+(\d+\.\d+)/', $out, $m)) {
+        return $m[1];
+    }
+    return 'Unknown';
+}
+
+// Helper: Get latest RAR version from rarlab.com
+function getLatestRarVersion() {
+    $ctx = stream_context_create(['http' => ['timeout' => 10, 'user_agent' => 'Mozilla/5.0']]);
+    $page = @file_get_contents('https://www.rarlab.com/download.htm', false, $ctx);
+    if ($page && preg_match('/rarlinux-x64-(\d+)\.tar\.gz/', $page, $m)) {
+        $ver = $m[1];
+        // Convert 720 -> 7.20
+        return substr($ver, 0, 1) . '.' . substr($ver, 1);
+    }
+    return false;
+}
+
+// AJAX endpoint: check latest RAR version (return early before HTML)
+if (isset($_GET['check_rar'])) {
+    header('Content-Type: text/plain');
+    $ver = getLatestRarVersion();
+    echo $ver ? $ver : 'error';
+    exit;
+}
 
 $message = '';
 $messageType = '';
@@ -41,9 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($f->isDir()) @rmdir($f->getRealPath());
                     else { @unlink($f->getRealPath()); $count++; }
                 }
-                // Clear files.lst
                 @file_put_contents($configDir . '/files.lst', '');
-                // Clear mega lock
                 @unlink($filesDir . '/.mega_lock');
                 @unlink($filesDir . '/mega_dl.php');
             }
@@ -61,6 +94,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             }
             break;
+
+        case 'save_config':
+            $content = $_POST['config_content'] ?? '';
+            if (@file_put_contents($configFile, $content)) {
+                $message = 'Configuration saved successfully. Reload the page to apply changes.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to save config file. Check permissions.';
+                $messageType = 'error';
+            }
+            break;
             
         case 'run_command':
             $cmd = $_POST['command'] ?? '';
@@ -75,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'git_update':
             $repoUrl = trim($_POST['repo_url'] ?? 'https://github.com/PBhadoo/Rapidleech');
             $branch = trim($_POST['repo_branch'] ?? 'main');
-            // Sanitize inputs - only allow valid git URLs and branch names
+            $fullReset = !empty($_POST['full_reset']);
             if (!preg_match('/^https:\/\/[a-zA-Z0-9._\-\/]+$/', $repoUrl)) {
                 $message = 'Invalid repository URL.';
                 $messageType = 'error';
@@ -86,11 +130,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
                 break;
             }
-            $repoUrl = escapeshellarg($repoUrl);
-            $branch = escapeshellarg($branch);
-            $cmd = "cd $rootDir && cp configs/accounts.php configs/accounts.php.bak && cp configs/config.php configs/config.php.bak && git remote set-url origin $repoUrl && git fetch origin $branch && git reset --hard origin/$branch && cp configs/accounts.php.bak configs/accounts.php && cp configs/config.php.bak configs/config.php && chmod -R 777 files/ configs/ 2>&1";
+            $repoUrlEsc = escapeshellarg($repoUrl);
+            $branchEsc = escapeshellarg($branch);
+            if ($fullReset) {
+                // Full reset: overwrite everything including configs
+                $cmd = "cd $rootDir && git remote set-url origin $repoUrlEsc && git fetch origin $branchEsc && git reset --hard origin/$branchEsc && chmod -R 777 files/ configs/ 2>&1";
+            } else {
+                // Preserve configs
+                $cmd = "cd $rootDir && cp configs/accounts.php configs/accounts.php.bak && cp configs/config.php configs/config.php.bak && git remote set-url origin $repoUrlEsc && git fetch origin $branchEsc && git reset --hard origin/$branchEsc && cp configs/accounts.php.bak configs/accounts.php && cp configs/config.php.bak configs/config.php && chmod -R 777 files/ configs/ 2>&1";
+            }
             $output = shell_exec($cmd);
-            $message = "Git update completed from " . htmlspecialchars(trim($_POST['repo_url'] ?? 'https://github.com/PBhadoo/Rapidleech')) . " ($branch).";
+            $resetType = $fullReset ? 'Full reset (configs overwritten)' : 'Configs preserved';
+            $message = "Git update completed. $resetType.";
+            $messageType = 'success';
+            break;
+
+        case 'update_rar':
+            $latestVer = getLatestRarVersion();
+            if (!$latestVer) {
+                $message = 'Could not fetch latest RAR version from rarlab.com.';
+                $messageType = 'error';
+                break;
+            }
+            $verNum = str_replace('.', '', $latestVer);
+            $tarball = "rarlinux-x64-{$verNum}.tar.gz";
+            $url = "https://www.rarlab.com/rar/$tarball";
+            $cmd = "cd $rootDir && rm -rf rar && wget -q '$url' && tar -xf '$tarball' && rm -f '$tarball' && chmod -R 777 rar 2>&1";
+            $output = shell_exec($cmd);
+            $newVer = getInstalledRarVersion($rootDir);
+            $message = "RAR updated to version $newVer.";
             $messageType = 'success';
             break;
     }
@@ -107,11 +175,16 @@ if (is_dir($filesDir)) {
 
 // Get accounts content
 $accountsContent = @file_get_contents($accountsFile) ?: '';
+// Get config content
+$configContent = @file_get_contents($configFile) ?: '';
 
 // Get disk info
 $diskFree = @disk_free_space($filesDir);
 $diskTotal = @disk_total_space($filesDir);
 $diskUsedPercent = ($diskTotal > 0) ? round(($diskTotal - $diskFree) / $diskTotal * 100, 1) : 0;
+
+// Get RAR info
+$installedRar = getInstalledRarVersion($rootDir);
 
 function formatBytes($b) { if ($b <= 0) return '0 B'; $s = ['B','KB','MB','GB','TB']; $e = floor(log($b)/log(1024)); return round($b/pow(1024,$e),2).' '.$s[$e]; }
 ?>
@@ -139,6 +212,8 @@ h1 span{background:linear-gradient(135deg,#6366f1,#a855f7);-webkit-background-cl
 .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(99,102,241,.3)}
 .btn-danger{background:#ef4444}
 .btn-danger:hover{background:#dc2626}
+.btn-warning{background:#f59e0b}
+.btn-warning:hover{background:#d97706}
 .btn-ghost{background:#1e2231;border:1px solid #282d3e;color:#a0a8c0}
 .btn-ghost:hover{background:#272c3e}
 textarea{width:100%;padding:14px;font:13px/1.5 'Consolas','Monaco',monospace;background:#0c0e16;color:#e8ecf4;border:1.5px solid #282d3e;border-radius:10px;resize:vertical;outline:none}
@@ -154,6 +229,12 @@ input[type="text"]:focus{border-color:#6366f1}
 .bar-fill{height:100%;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:4px}
 a.back{color:#818cf8;text-decoration:none;font-size:13px}
 a.back:hover{text-decoration:underline}
+label.check{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#a0a8c0;cursor:pointer}
+label.check input{accent-color:#6366f1}
+.tag{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600}
+.tag-green{background:rgba(16,185,129,.15);color:#10b981}
+.tag-yellow{background:rgba(245,158,11,.15);color:#f59e0b}
+.tag-red{background:rgba(239,68,68,.15);color:#ef4444}
 </style>
 </head>
 <body>
@@ -199,6 +280,18 @@ a.back:hover{text-decoration:underline}
         </form>
     </div>
 
+    <!-- Configuration -->
+    <div class="card">
+        <h2>⚙️ Configuration</h2>
+        <h3>Edit configs/config.php — admin credentials, file size limits, forbidden types, and more</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="save_config">
+            <textarea name="config_content" rows="25"><?php echo htmlspecialchars($configContent); ?></textarea>
+            <br><br>
+            <button type="submit" class="btn btn-primary">💾 Save Configuration</button>
+        </form>
+    </div>
+
     <!-- Premium Accounts -->
     <div class="card">
         <h2>🔑 Premium Accounts</h2>
@@ -211,11 +304,41 @@ a.back:hover{text-decoration:underline}
         </form>
     </div>
 
+    <!-- RAR Update -->
+    <div class="card">
+        <h2>📦 RAR / UnRAR</h2>
+        <h3>Manage RAR binary for archive operations</h3>
+        <div class="flex" style="margin-bottom:12px;align-items:center;gap:16px">
+            <div>
+                <span style="color:#606880;font-size:13px">Installed:</span>
+                <span class="tag <?php echo ($installedRar === 'Not installed') ? 'tag-red' : 'tag-green'; ?>"><?php echo htmlspecialchars($installedRar); ?></span>
+            </div>
+            <div id="rar-latest">
+                <span style="color:#606880;font-size:13px">Latest:</span>
+                <span class="tag tag-yellow">Checking...</span>
+            </div>
+        </div>
+        <form method="POST" onsubmit="return confirm('This will download and install the latest RAR from rarlab.com.');">
+            <input type="hidden" name="action" value="update_rar">
+            <button type="submit" class="btn btn-primary">📦 Update RAR to Latest</button>
+        </form>
+        <?php if (isset($output) && ($_POST['action'] ?? '') === 'update_rar'): ?>
+        <div class="output"><?php echo htmlspecialchars($output); ?></div>
+        <?php endif; ?>
+        <script>
+        // Fetch latest RAR version async
+        fetch('?check_rar=1').then(r=>r.text()).then(v=>{
+            if(v&&v!=='error'){document.querySelector('#rar-latest .tag').textContent=v;document.querySelector('#rar-latest .tag').className='tag tag-green';}
+            else{document.querySelector('#rar-latest .tag').textContent='Could not check';document.querySelector('#rar-latest .tag').className='tag tag-yellow';}
+        }).catch(()=>{document.querySelector('#rar-latest .tag').textContent='Error';document.querySelector('#rar-latest .tag').className='tag tag-red';});
+        </script>
+    </div>
+
     <!-- Git Update -->
     <div class="card">
-        <h2>🔄 Quick Update from GitHub</h2>
-        <h3>Pulls latest code from a GitHub repo. Preserves accounts.php and config.php.</h3>
-        <form method="POST" onsubmit="return confirm('This will update all code from the specified repo. Your accounts and config will be preserved.');">
+        <h2>🔄 Update from GitHub</h2>
+        <h3>Pulls latest code from a GitHub repo.</h3>
+        <form method="POST" onsubmit="return confirm(document.getElementById('full_reset').checked ? 'FULL RESET: This will OVERWRITE config.php and accounts.php with repo defaults!' : 'This will update code. Your accounts and config will be preserved.');">
             <input type="hidden" name="action" value="git_update">
             <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:12px">
                 <div>
@@ -227,9 +350,14 @@ a.back:hover{text-decoration:underline}
                     <input type="text" name="repo_branch" placeholder="main" value="<?php echo htmlspecialchars($_POST['repo_branch'] ?? 'main'); ?>">
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">🔄 Update from GitHub</button>
+            <div class="flex" style="margin-bottom:12px">
+                <label class="check"><input type="checkbox" name="full_reset" id="full_reset" value="1"> ⚠️ Full Reset (overwrite config.php & accounts.php)</label>
+            </div>
+            <div class="flex">
+                <button type="submit" class="btn btn-primary">🔄 Update from GitHub</button>
+            </div>
         </form>
-        <?php if (isset($output) && $_POST['action'] === 'git_update'): ?>
+        <?php if (isset($output) && ($_POST['action'] ?? '') === 'git_update'): ?>
         <div class="output"><?php echo htmlspecialchars($output); ?></div>
         <?php endif; ?>
     </div>
@@ -245,7 +373,7 @@ a.back:hover{text-decoration:underline}
                 <button type="submit" class="btn btn-ghost">▶ Run</button>
             </div>
         </form>
-        <?php if (isset($output) && $_POST['action'] === 'run_command'): ?>
+        <?php if (isset($output) && ($_POST['action'] ?? '') === 'run_command'): ?>
         <div class="output"><?php echo htmlspecialchars($output); ?></div>
         <?php endif; ?>
     </div>
