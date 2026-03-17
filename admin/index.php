@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $verNum = str_replace('.', '', $latestVer);
             $tarball = "rarlinux-x64-{$verNum}.tar.gz";
             $url = "https://www.rarlab.com/rar/$tarball";
-            $cmd = "cd $rootDir && rm -rf rar && wget '$url' -O '$tarball' 2>&1 && tar -xf '$tarball' 2>&1 && rm -f '$tarball' && chmod -R 777 rar && echo 'Done.' && rar/rar 2>&1 | head -2";
+            $cmd = "cd $rootDir && rm -rf rar && wget '$url' -O '$tarball' 2>&1 && tar -xf '$tarball' 2>&1 && rm -f '$tarball' && chmod -R 777 rar && chmod +x rar/rar rar/unrar 2>/dev/null && echo 'Done.' && rar/rar 2>&1 | head -2";
             $output = shell_exec($cmd);
             $newVer = getInstalledRarVersion($rootDir);
             if ($newVer === 'Unknown' || $newVer === 'Not installed') {

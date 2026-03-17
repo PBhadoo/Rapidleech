@@ -83,6 +83,7 @@ sudo wget -q https://www.rarlab.com/rar/rarlinux-x64-720.tar.gz
 sudo tar -xf rarlinux-x64-720.tar.gz
 sudo rm -f rarlinux-x64-720.tar.gz
 sudo chmod -R 777 rar
+sudo chmod +x rar/rar rar/unrar 2>/dev/null
 
 echo ""
 echo "========================================="
