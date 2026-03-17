@@ -19,7 +19,7 @@ if (!function_exists('str_ends_with')) {
 // For ajax calls, lets make it use less resource as possible
 switch ($_GET['ajax']) {
 	case 'pending_downloads':
-		// Get pending/in-progress downloads (files with .part extension or recently modified files)
+		// Get pending/in-progress downloads (files with download-related extensions)
 		if (!str_ends_with($options['download_dir'], '/')) {
 			$options['download_dir'] .= '/';
 		}
@@ -28,6 +28,18 @@ switch ($_GET['ajax']) {
 		$chunkGroups = array(); // Group chunk files by base name
 		$metaFiles = array(); // Store metadata files for chunk downloads
 		$fileMetaFiles = array(); // Store metadata files for single-stream downloads
+		
+		// Load completed files list to exclude them from pending
+		$completedFiles = array();
+		$filesLst = @file(CONFIG_DIR . 'files.lst', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+		if ($filesLst) {
+			foreach ($filesLst as $line) {
+				$entry = @unserialize(trim($line));
+				if ($entry && !empty($entry['name'])) {
+					$completedFiles[basename($entry['name'])] = true;
+				}
+			}
+		}
 		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
@@ -92,20 +104,27 @@ switch ($_GET['ajax']) {
 					continue;
 				}
 				
-				// Consider as pending if:
-				// 1. Has .part extension (download in progress)
-				// 2. Has .tmp extension
-				// 3. File was modified in last 60 seconds (actively downloading)
+				// Skip files already registered as completed downloads
+				if (isset($completedFiles[$file])) {
+					continue;
+				}
+				
+				// Skip hidden files and known non-download files
+				if ($file[0] === '.' || $file === 'index.html' || $file === 'mega_dl.php') {
+					continue;
+				}
+				
+				// Only consider as pending if:
+				// 1. Has explicit download-in-progress extension (.part, .tmp, .download)
+				// 2. Zero-byte file created in last 30 seconds (just starting)
+				// Do NOT flag normal completed files just because they were recently modified
 				$isPending = false;
 				$status = '';
 				
 				if ($ext === 'part' || $ext === 'tmp' || $ext === 'download') {
 					$isPending = true;
 					$status = 'Downloading...';
-				} elseif ($age < 60) {
-					$isPending = true;
-					$status = 'Downloading...';
-				} elseif ($age < 300 && $size === 0) {
+				} elseif ($size === 0 && $age < 30) {
 					$isPending = true;
 					$status = 'Starting...';
 				}
@@ -192,6 +211,18 @@ switch ($_GET['ajax']) {
 		$metaFiles = array(); // Store metadata files for chunk downloads
 		$fileMetaFiles = array(); // Store metadata files for single-stream downloads
 		
+		// Load completed files list to exclude them from pending
+		$completedFiles = array();
+		$filesLst = @file(CONFIG_DIR . 'files.lst', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+		if ($filesLst) {
+			foreach ($filesLst as $line) {
+				$entry = @unserialize(trim($line));
+				if ($entry && !empty($entry['name'])) {
+					$completedFiles[basename($entry['name'])] = true;
+				}
+			}
+		}
+		
 		if (is_dir($download_dir) && ($dir = @opendir($download_dir))) {
 			$now = time();
 			while (($file = readdir($dir)) !== false) {
@@ -234,10 +265,6 @@ switch ($_GET['ajax']) {
 					continue;
 				}
 				
-				$mtime = @filemtime($filepath);
-				$size = @filesize($filepath);
-				$age = $now - $mtime;
-				
 				// Check for parallel download chunk files (.chunk_*_*.tmp)
 				if (preg_match('/^\.chunk_([a-f0-9]+)_(\d+)\.tmp$/', $file, $matches)) {
 					$chunkGroup = $matches[1];
@@ -259,16 +286,26 @@ switch ($_GET['ajax']) {
 					continue;
 				}
 				
-				// Consider as pending if: .part/.tmp/.download extension OR recently modified
+				// Skip files already registered as completed downloads
+				if (isset($completedFiles[$file])) {
+					continue;
+				}
+				
+				// Skip hidden files and known non-download files
+				if ($file[0] === '.' || $file === 'index.html' || $file === 'mega_dl.php') {
+					continue;
+				}
+				
+				// Only consider as pending if it has an in-progress extension
 				$isPending = false;
 				$status = '';
 				
 				if ($ext === 'part' || $ext === 'tmp' || $ext === 'download') {
 					$isPending = true;
 					$status = 'Downloading...';
-				} elseif ($age < 30) {
+				} elseif ($size === 0 && $age < 30) {
 					$isPending = true;
-					$status = 'Downloading...';
+					$status = 'Starting...';
 				}
 				
 				if ($isPending) {
@@ -514,25 +551,6 @@ switch ($_GET['ajax']) {
 				echo 'busy';
 			}
 		}
-		break;
-	case 'pending_downloads':
-		require_once(CLASS_DIR . 'download_tracker.php');
-		$downloads = get_active_downloads();
-		$result = array();
-		foreach ($downloads as $dl) {
-			$result[] = array(
-				'id' => $dl['id'],
-				'filename' => htmlspecialchars($dl['filename']),
-				'link' => htmlspecialchars(substr($dl['link'], 0, 80) . (strlen($dl['link']) > 80 ? '...' : '')),
-				'percent' => $dl['percent'],
-				'received' => bytesToKbOrMbOrGb($dl['received_bytes']),
-				'total' => $dl['total_bytes'] > 0 ? bytesToKbOrMbOrGb($dl['total_bytes']) : 'Unknown',
-				'status' => $dl['status'],
-				'elapsed' => time() - $dl['start_time']
-			);
-		}
-		header('Content-Type: application/json');
-		echo json_encode(array('downloads' => $result, 'count' => count($result)));
 		break;
 	case 'linkcheck':
 		require_once(CLASS_DIR.'linkchecker.php');
