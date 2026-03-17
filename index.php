@@ -310,6 +310,14 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 
 	if ($lastError) html_error(htmlspecialchars($lastError));
 	elseif ($file['bytesReceived'] == $file['bytesTotal'] || $file['size'] == 'Unknown') {
+		// Auto-detect and fix file extension using magic bytes
+		if (function_exists('fixFileExtension') && !empty($file['file']) && is_file($file['file'])) {
+			$originalFile = $file['file'];
+			$file['file'] = fixFileExtension($file['file']);
+			if ($file['file'] !== $originalFile) {
+				$file['name'] = basename($file['file']);
+			}
+		}
 		echo '<script type="text/javascript">' . "pr(100, '" . $file['size'] . "', '" . $file['speed'] . "')</script>\r\n";
 		echo sprintf(lang(10), link_for_file($file['file']), $file['size'], $file['time'], $file['speed']);
 		$file['date'] = time();

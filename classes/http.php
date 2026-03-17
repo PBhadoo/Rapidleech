@@ -429,6 +429,18 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 			$bytesSaved = fwrite($fs, $data);
 			if ($bytesSaved !== false && $datalen == $bytesSaved) {
 				$bytesReceived += $bytesSaved;
+				// Runtime size limit enforcement (catches chunked transfers with no Content-Length)
+				if ($options['file_size_limit'] > 0 && ($bytesReceived + $Resume['from']) > ($options['file_size_limit'] * 1024 * 1024)) {
+					flock($fs, LOCK_UN);
+					fclose($fs);
+					@unlink($saveToFile);
+					$metaFile = dirname($saveToFile) . '/.' . basename($saveToFile) . '.meta';
+					if (file_exists($metaFile)) @unlink($metaFile);
+					$lastError = 'Download exceeded size limit of ' . bytesToKbOrMbOrGb($options['file_size_limit'] * 1024 * 1024) . '. Download aborted and file deleted.';
+					stream_socket_shutdown($fp, STREAM_SHUT_RDWR);
+					fclose($fp);
+					return false;
+				}
 			} else {
 				$lastError = sprintf(lang(105), $FileName);
 				return false;
@@ -664,6 +676,161 @@ function StrToCookies($cookies, $cookie=array(), $del=true, $dval=array('','dele
 		}
 	}
 	return $cookie;
+}
+
+/**
+ * Detect correct file extension using magic bytes (file signatures)
+ * @param string $filePath Path to the file
+ * @return string|false Returns the correct extension (with dot) or false if unknown
+ */
+function detectExtensionByMagicBytes($filePath) {
+	if (!is_file($filePath) || !is_readable($filePath)) return false;
+	
+	$fp = @fopen($filePath, 'rb');
+	if (!$fp) return false;
+	
+	// Read first 16 bytes for signature detection
+	$header = fread($fp, 16);
+	fclose($fp);
+	
+	if (strlen($header) < 4) return false;
+	
+	// Magic bytes signatures (hex) => extension
+	// Check longer signatures first for accuracy
+	$signatures = array(
+		// Video formats
+		array('bytes' => "\x1A\x45\xDF\xA3", 'ext' => '.mkv'),    // Matroska/WebM
+		array('bytes' => "\x00\x00\x00", 'check' => function($h) { // MP4/MOV/3GP family (ftyp box)
+			if (strlen($h) < 8) return false;
+			$box = substr($h, 4, 4);
+			return ($box === 'ftyp') ? true : false;
+		}, 'ext_fn' => function($h) {
+			$brand = substr($h, 8, 4);
+			if (in_array($brand, array('isom', 'iso2', 'mp41', 'mp42', 'M4V ', 'dash', 'avc1'))) return '.mp4';
+			if (in_array($brand, array('qt  ', 'MSNV'))) return '.mov';
+			if (in_array($brand, array('3gp4', '3gp5', '3gp6', '3ge6', '3ge7'))) return '.3gp';
+			if (in_array($brand, array('M4A ', 'M4B '))) return '.m4a';
+			return '.mp4'; // Default for ftyp
+		}),
+		array('bytes' => "\x46\x4C\x56\x01", 'ext' => '.flv'),    // FLV
+		array('bytes' => "\x00\x00\x01\xBA", 'ext' => '.mpg'),    // MPEG
+		array('bytes' => "\x00\x00\x01\xB3", 'ext' => '.mpg'),    // MPEG
+		
+		// Audio formats
+		array('bytes' => "\x49\x44\x33", 'ext' => '.mp3'),        // MP3 with ID3
+		array('bytes' => "\xFF\xFB", 'ext' => '.mp3'),             // MP3
+		array('bytes' => "\xFF\xF3", 'ext' => '.mp3'),             // MP3
+		array('bytes' => "\xFF\xF2", 'ext' => '.mp3'),             // MP3
+		array('bytes' => "OggS", 'ext' => '.ogg'),                 // OGG
+		array('bytes' => "fLaC", 'ext' => '.flac'),                // FLAC
+		array('bytes' => "RIFF", 'check' => function($h) {        // WAV/AVI
+			return strlen($h) >= 12;
+		}, 'ext_fn' => function($h) {
+			$type = substr($h, 8, 4);
+			if ($type === 'WAVE') return '.wav';
+			if ($type === 'AVI ') return '.avi';
+			return false;
+		}),
+		
+		// Image formats
+		array('bytes' => "\x89PNG", 'ext' => '.png'),
+		array('bytes' => "\xFF\xD8\xFF", 'ext' => '.jpg'),
+		array('bytes' => "GIF87a", 'ext' => '.gif'),
+		array('bytes' => "GIF89a", 'ext' => '.gif'),
+		array('bytes' => "BM", 'ext' => '.bmp'),
+		array('bytes' => "RIFF", 'check' => function($h) {
+			return strlen($h) >= 12 && substr($h, 8, 4) === 'WEBP';
+		}, 'ext' => '.webp'),
+		
+		// Archive formats
+		array('bytes' => "PK\x03\x04", 'ext' => '.zip'),
+		array('bytes' => "Rar!\x1A\x07", 'ext' => '.rar'),
+		array('bytes' => "\x1F\x8B\x08", 'ext' => '.gz'),
+		array('bytes' => "BZh", 'ext' => '.bz2'),
+		array('bytes' => "\xFD\x37\x7A\x58\x5A\x00", 'ext' => '.xz'),
+		array('bytes' => "\x37\x7A\xBC\xAF\x27\x1C", 'ext' => '.7z'),
+		
+		// Document formats
+		array('bytes' => "%PDF", 'ext' => '.pdf'),
+		array('bytes' => "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1", 'ext' => '.doc'), // MS Office legacy
+		
+		// Executable
+		array('bytes' => "MZ", 'ext' => '.exe'),
+		
+		// ISO
+		// ISO9660 has signature at offset 32769, skip for now
+	);
+	
+	foreach ($signatures as $sig) {
+		$bytes = $sig['bytes'];
+		$len = strlen($bytes);
+		
+		if (strlen($header) < $len) continue;
+		
+		if (substr($header, 0, $len) === $bytes) {
+			// Custom check function
+			if (isset($sig['check']) && !$sig['check']($header)) continue;
+			
+			// Custom extension function
+			if (isset($sig['ext_fn'])) {
+				$ext = $sig['ext_fn']($header);
+				if ($ext !== false) return $ext;
+				continue;
+			}
+			
+			return $sig['ext'];
+		}
+	}
+	
+	return false;
+}
+
+/**
+ * Fix file extension based on magic bytes detection
+ * Renames the file if the detected extension differs from the current one
+ * @param string $filePath Path to the downloaded file
+ * @return string The (possibly updated) file path
+ */
+function fixFileExtension($filePath) {
+	$detectedExt = detectExtensionByMagicBytes($filePath);
+	if ($detectedExt === false) return $filePath;
+	
+	$currentExt = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+	$detectedExtClean = ltrim(strtolower($detectedExt), '.');
+	
+	// If extensions already match, no change needed
+	if ($currentExt === $detectedExtClean) return $filePath;
+	
+	// Map equivalent extensions (don't rename these)
+	$equivalents = array(
+		'jpg' => array('jpeg', 'jpe', 'jfif'),
+		'mpg' => array('mpeg', 'mpe'),
+		'mp4' => array('m4v'),
+		'gz' => array('tgz'),
+		'doc' => array('xls', 'ppt', 'msi'), // All use same magic bytes
+	);
+	
+	foreach ($equivalents as $main => $alts) {
+		if ($detectedExtClean === $main && in_array($currentExt, $alts)) return $filePath;
+		if (in_array($detectedExtClean, $alts) && $currentExt === $main) return $filePath;
+	}
+	
+	// Rename the file with correct extension
+	$dir = dirname($filePath);
+	$baseName = pathinfo($filePath, PATHINFO_FILENAME);
+	$newPath = $dir . PATH_SPLITTER . $baseName . $detectedExt;
+	
+	// Avoid overwriting
+	if (file_exists($newPath)) {
+		$newPath = $dir . PATH_SPLITTER . $baseName . '_' . time() . $detectedExt;
+	}
+	
+	if (@rename($filePath, $newPath)) {
+		echo "<br /><b>⚠ Extension corrected:</b> " . htmlspecialchars(basename($filePath)) . " → " . htmlspecialchars(basename($newPath)) . "<br />";
+		return $newPath;
+	}
+	
+	return $filePath;
 }
 
 function GetChunkSize($fsize) {
