@@ -30,9 +30,12 @@ function getInstalledRarVersion($rootDir) {
         $rarExec = $rootDir . '/rar/unrar';
     }
     if (!file_exists($rarExec)) return 'Not installed';
-    $out = @shell_exec(escapeshellarg($rarExec) . ' 2>&1 | head -1');
-    if ($out && preg_match('/(?:UNRAR|RAR)\s+(\d+\.\d+)/', $out, $m)) {
-        return $m[1];
+    $out = @shell_exec(escapeshellarg($rarExec) . ' 2>&1');
+    if ($out) {
+        // Try multiple patterns: "RAR 7.20", "UNRAR 7.20", "rar 7.20", version lines
+        if (preg_match('/(?:UNRAR|RAR)\s+(\d+\.\d+)/i', $out, $m)) return $m[1];
+        if (preg_match('/(\d+\.\d+)\s+(?:beta|freeware|trial)/i', $out, $m)) return $m[1];
+        if (preg_match('/version\s+(\d+\.\d+)/i', $out, $m)) return $m[1];
     }
     return 'Unknown';
 }
