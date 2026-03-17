@@ -330,6 +330,13 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 		$bytesTotal = trim(cut_str($header, "\nContent-Length: ", "\n"));
 
 		global $options;
+		// Block downloads that don't provide file size (no Content-Length header)
+		if (!empty($options['require_content_length']) && (empty($bytesTotal) || !is_numeric($bytesTotal) || $bytesTotal <= 0)) {
+			$lastError = 'Download blocked: Server did not provide file size (Content-Length header missing). This is required for security.';
+			stream_socket_shutdown($fp, STREAM_SHUT_RDWR);
+			fclose($fp);
+			return false;
+		}
 		if ($options['file_size_limit'] > 0 && ($bytesTotal > ($options['file_size_limit'] * 1024 * 1024))) {
 			$lastError = lang(336) . bytesToKbOrMbOrGb ($options['file_size_limit'] * 1024 * 1024) . '.';
 			return false;

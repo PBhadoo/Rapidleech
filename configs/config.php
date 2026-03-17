@@ -60,24 +60,26 @@ $options = array (
   '2gb_fix' => true,
   'forbidden_filetypes' => 
   array (
-    0 => '.htaccess',
-    1 => '.htpasswd',
-    2 => '.php',
-    3 => '.php3',
-    4 => '.php4',
-    5 => '.php5',
-    6 => '.phtml',
-    7 => '.asp',
-    8 => '.aspx',
-    9 => '.cgi',
-    10 => '.bin',
+    // Server-side scripts
+    '.htaccess', '.htpasswd', '.php', '.php3', '.php4', '.php5', '.phtml',
+    '.asp', '.aspx', '.cgi', '.bin',
+    // Executables
+    '.exe', '.msi', '.bat', '.cmd', '.com', '.scr', '.pif', '.vbs', '.vbe',
+    '.js', '.jse', '.wsf', '.wsh', '.ps1', '.psm1', '.sh', '.bash',
+    '.dll', '.sys', '.drv', '.ocx',
+    // Images (block fake large files disguised as images)
+    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.tiff', '.tif',
+    '.svg', '.webp', '.heic', '.heif',
   ),
   'forbidden_filetypes_block' => true,
   'rename_these_filetypes_to' => '.xxx',
   'check_these_before_unzipping' => true,
+  'require_content_length' => true,
   'fgc' => 0,
   'parallel_download' => true,
   'parallel_chunks' => 8,
+  'admin_user' => 'admin',
+  'admin_pass' => 'admin',
 ); 
 
 require_once('site_checker.php');

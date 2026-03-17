@@ -4,9 +4,12 @@
  * Simple admin interface for server management
  */
 
-// Admin credentials - change these!
-$ADMIN_USER = 'admin';
-$ADMIN_PASS = 'admin';
+// Admin credentials from config.php (change in configs/config.php)
+$rootDir = dirname(__DIR__);
+$configDir = $rootDir . '/configs';
+require_once($configDir . '/config.php');
+$ADMIN_USER = isset($options['admin_user']) ? $options['admin_user'] : 'admin';
+$ADMIN_PASS = isset($options['admin_pass']) ? $options['admin_pass'] : 'admin';
 
 // Basic auth
 if (empty($_SERVER['PHP_AUTH_USER']) || $_SERVER['PHP_AUTH_USER'] !== $ADMIN_USER || $_SERVER['PHP_AUTH_PW'] !== $ADMIN_PASS) {
@@ -15,10 +18,7 @@ if (empty($_SERVER['PHP_AUTH_USER']) || $_SERVER['PHP_AUTH_USER'] !== $ADMIN_USE
     die('Access Denied');
 }
 
-define('RAPIDLEECH', 'yes');
-$rootDir = dirname(__DIR__);
 $filesDir = $rootDir . '/files';
-$configDir = $rootDir . '/configs';
 $accountsFile = $configDir . '/accounts.php';
 
 $message = '';
