@@ -27,6 +27,7 @@ sudo add-apt-repository -y ppa:ondrej/php
 sudo apt -y update
 
 # Install PHP 8.3 with all required extensions
+# Note: openssl is built into PHP core, no separate package needed
 sudo apt install -y php8.3 \
     php8.3-common \
     php8.3-cli \
@@ -36,7 +37,6 @@ sudo apt install -y php8.3 \
     php8.3-xml \
     php8.3-zip \
     php8.3-bcmath \
-    php8.3-openssl \
     php8.3-intl \
     php8.3-opcache \
     php8.3-mysql \
