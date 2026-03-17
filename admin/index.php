@@ -159,7 +159,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $verNum = str_replace('.', '', $latestVer);
             $tarball = "rarlinux-x64-{$verNum}.tar.gz";
             $url = "https://www.rarlab.com/rar/$tarball";
-            $cmd = "cd $rootDir && rm -rf rar && wget '$url' -O '$tarball' 2>&1 && tar -xf '$tarball' 2>&1 && rm -f '$tarball' && chmod -R 777 rar && chmod +x rar/rar rar/unrar 2>/dev/null && echo 'Done.' && rar/rar 2>&1 | head -2";
+            // Use absolute paths; show all errors
+            $cmd = "cd $rootDir && echo 'Removing old rar...' && rm -rf $rootDir/rar 2>&1 && echo 'Downloading $tarball...' && wget -O $rootDir/$tarball '$url' 2>&1 && echo 'Extracting...' && tar -xf $rootDir/$tarball -C $rootDir 2>&1 && rm -f $rootDir/$tarball && chmod -R 777 $rootDir/rar && chmod +x $rootDir/rar/rar $rootDir/rar/unrar 2>/dev/null && echo 'RAR binary info:' && $rootDir/rar/rar 2>&1 | head -3";
             $output = shell_exec($cmd);
             $newVer = getInstalledRarVersion($rootDir);
             if ($newVer === 'Unknown' || $newVer === 'Not installed') {
