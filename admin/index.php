@@ -7,6 +7,7 @@
 // Admin credentials from config.php (change in configs/config.php)
 $rootDir = dirname(__DIR__);
 $configDir = $rootDir . '/configs';
+define('RAPIDLEECH', 'yes');
 require_once($configDir . '/config.php');
 $ADMIN_USER = isset($options['admin_user']) ? $options['admin_user'] : 'admin';
 $ADMIN_PASS = isset($options['admin_pass']) ? $options['admin_pass'] : 'admin';
