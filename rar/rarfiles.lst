@@ -36,6 +36,7 @@ readme.*
 *.ini
 *.bat
 *.cmd
+*.ps1
 *.h
 *.hpp
 *.c
@@ -70,6 +71,7 @@ $default
 *.tif
 *.png
 *.jpg
+*.jxl
 *.chm
 *.pdf
 *.cab
@@ -83,9 +85,14 @@ $default
 *.gz
 *.bz2
 *.xz
+*.zst
+*.zstd
 *.jar
+*.avif
 *.fla
 *.flac
+*.heif
 *.ape
 *.bik
 *.mkv
+*.webp

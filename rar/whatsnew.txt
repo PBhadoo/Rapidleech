@@ -1,6 +1,301 @@
                 RAR - What's new in the latest version
 
 
+  Version 7.20
+
+  1. Additionally to already used $HOME and /etc, RAR also searches
+     for .rarrc configuration file in $XDG_CONFIG_HOME/rar directory
+     or in $HOME/.config/rar directory if XDG_CONFIG_HOME environment
+     variable isn't defined
+
+  2. Performance improvements when deleting files in solid RAR archives:
+
+     a) if there are no non-zero files after deleted files, archive
+        recompressing isn't performed;
+     
+     b) part of archive before deleted files is copied as is, without
+        repacking. Its contents is unpacked to memory if necessary,
+        but not recompressed;
+
+     c) semi-solid archive processing involves only solid blocks containing
+        deleted files. Unaffected solid blocks are copied as is.
+  
+  3. "Generate archive name by mask" archiving option and -ag command line
+      switch:
+
+     a) new 'K' format character defines the current day of week 
+        name as a text string;
+
+     b) new 'O' format character defines the current month name as a text
+        string regardless of format character number. Unlike "MMM" mask,
+        it allows to use shorter or longer than 3 character names,
+        such as -agOO;
+
+     c) excessive format characters exceeding the available field width
+        are now ignored instead of appending to archive name.
+        So it is possible to use full month or week day names by providing
+        format characters in the amount equal or exceeding the longest name,
+        such as -agKKKKKKKKKK for day of week names.
+  
+  4. Command line -s switch:
+  
+     a) switch -s accepts the optional parameter preceded by '=' character.
+        
+        Switches -s<N>, -se, -sv, -sv-, -s- are replaced by -s=<N>f, -s=e,
+        -s=v, -s=d, -s=-. Previous versions of these switches are still
+        supported in the current version, but can be removed in the future.
+
+        It is allowed to combine multiple modifiers in the same switch,
+        such as -s=e100f.
+
+     b) new switch -s=r resets the solid statistics before adding new files
+        to existing archive.
+  
+  5. Switch -tk now accepts the optional date parameter in YYYYMMDDHHMMSS
+     format. If used without parameter when modifying an archive,
+     it preserves the original archive time. If optional parameter
+     is present, it is assigned to archive modification time.
+
+     It is allowed to insert separators like '-' or ':' to the date string
+     and omit trailing fields. For example, switch -tk2025-06-01 is correct.
+
+  6. "minsize" parameter, defining the minimum file reference size
+     in -oi[0-4][:<minsize>] switch, now can include an optional trailing
+     unit size character. So -oi:1m is the equivalent of -oi:104
+
+   
+   Version 7.12
+
+   1. If -t and -rv archiving switches are used together, recovery volumes
+      are also tested. Previous versions completed the test before creating
+      recovery volumes, so they hadn't been verified.
+
+   2. Bugs fixed:
+
+     a) RAR 7.10 and 7.11 for Unix didn't reduce the compression dictionary
+        size when archiving, even if source data size allowed it.
+
+
+   Version 7.11
+
+   1. Bugs fixed:
+
+      a) RAR 7.10 failed to update solid archives containing a directory
+         record placed before a file record. It issued the checksum error
+         message and aborted processing.
+
+         As a result of this fix, this version preserves the original
+         position of such directories after updating and doesn't move them
+         to the end of archive as RAR 7.10 did.
+
+   
+   Version 7.10
+
+   1. Linux and FreeBSD versions for x86 32-bit are not supported anymore.
+
+   2. Name of environment variable to store the default set of RAR switches
+      is changed from "RAR" to "RARINISWITCHES". It is rather typical
+      for batch scripts to use "RAR" environment variable name to store
+      RAR executable pathname, which led to the name conflict previously.
+
+   3. When adding files to existing RAR archive, directories previously stored
+      in such archive are moved to a position after newly added files.
+      So directory timestamps are set after extracting all files and are not
+      modified when creating files inside of these directories.
+
+   4. Temporary file isn't created anymore for "rar ch -tl" command if other
+      switches or archive parameters do not imply the archive modification.
+      Modification time of newest archived file is set directly to original
+      archive file, without copying the archive data. It reduces disk write
+      and processing time.
+   
+   5. If archive is truncated at recovery record or quick open information
+      service blocks, the additional message with truncated block type
+      is displayed after the standard "Unexpected end of archive".
+   
+   5. Bugs fixed:
+
+      a) if new files have been added to existing semi-solid RAR archive
+         created with -se or -s<N> switches, in some cases these newly
+         added files in the resulting archive could be damaged.
+         
+         This issue doesn't affect usual solid archives created with -s,
+         also as non-solid archives;
+
+      b) even though the long range search isn't used with -m1 "fastest"
+         compression method, switches -m1 -mcl+ or -m1 -mcl with 256MB
+         or larger compression dictionary still allocated memory required
+         for long range search algorithm.
+
+   
+   Version 7.00
+
+   1. Compression dictionary sizes larger than 1 GB are supported
+      for RAR archive format. Depending on the amount of physically
+      available memory, dictionary up to 64 GB can be selected.
+
+      Not power of 2 dictionary sizes can be specified for dictionaries
+      exceeding 4 GB. So we are not limited to 4, 8, 16, 32, 64 series
+      and can use values like 5 GB or 22 GB.
+
+      Archives with dictionaries exceeding 4 GB can be unpacked only
+      by RAR 7.0 or newer.
+
+      Increasing the dictionary size can improve the compression ratio
+      for large files with distant repeated blocks, like virtual machine
+      disk images. It also can be efficient for sets of large similar files
+      in a solid archive, such as a collection of software ISO images
+      differing by version or localization.
+
+   2. By default RAR refuses to unpack archives with dictionary exceeding
+      4 GB. It is done to prevent the unexpected excessive memory allocation.
+      
+      Use -md<size> or -mdx<size> to allow unpacking dictionaries up to
+      and including the specified size. Unlike -md<size>, -mdx<size>
+      is applied to extraction only and can be added to RAR environment
+      variable, not affecting archiving commands.
+
+   3. Alternate search algorithm, optimized to locate longer and more distant
+      repeated data blocks, can be used when creating RAR archives.
+      It helps to improve the compression ratio and sometimes speed
+      for redundant data like big text files.
+      
+      It increases memory usage and might reduce the compression speed
+      for some types of data. It can be turned on or off with
+      with -mcl[+|-] switch. If -mcl is not present, RAR applies the long
+      range search depending on the compression method, dictionary size
+      and other parameters.
+
+      This algorithm is required for dictionaries exceeding 4 GB
+      and turning it off is ignored for such dictionaries.
+
+   4. Much slower and more exhaustive repeated data search and compression
+      algorithm can be enabled with -mcx switch. It might provide
+      the additional compression gain for some types of redundant data,
+      but at much lower compression speed.
+
+      Long range search is needed to implement this mode efficiently,
+      so the exhaustive search option activates it automatically.
+
+      Both long range and exhaustive search option do not affect
+      the compatibility of created archives. So if dictionary size
+      is in 128 KB - 4 GB range, archives created with these search options
+      can be unpacked by all RAR versions beginning from 5.0.
+         
+   5. Maximum path length limit is increased from 2047 to 65535 characters.
+
+   6. Creating archives in RAR 4.x format isn't supported anymore.
+      Options and switches specific for this format are removed.
+      It doesn't affect RAR 4.x archives decompression, which is included
+      into RAR.
+
+   7. Switch -ol- prohibits archiving and extracting symbolic links.
+   
+   8. Switches -sl<size>[u] and -sm<size>[u] recognize [k|K|m|M|g|G|t|T]
+      size units for kilobytes, thousands of bytes, megabytes, millions
+      of bytes, gigabytes, billions of bytes, terabytes, trillions of bytes.
+      If unit character is 'b', 'B' or not present, bytes are assumed.
+
+      Previously these switches accepted bytes only.
+   
+   9. Switch -v<size>[unit] recognizes 't' and 'T' as terabytes and
+      trillions of bytes for volume size units.
+   
+  10. Proper progress is displayed when compressing symbolic link targets.
+
+   
+   Version 6.24
+
+   1. Bugs fixed:
+
+      a) extraction command dereferenced a null pointer and crashed
+         when processing a zero length archive name in the archive metadata
+         stored with -am switch.
+
+         We are thankful to Radoslaw Madej from Check Point software
+         for reporting this issue.
+
+   
+   Version 6.23
+
+   1. Bugs fixed:
+
+      a) a security issue involving out of bounds write is fixed
+         in RAR4 recovery volumes processing code.
+
+         We are thankful to goodbyeselene working with Trend Micro Zero Day
+         Initiative for letting us know about this bug.
+
+   
+   Version 6.22
+
+   1. Bugs fixed:
+
+      a) extracting individual files from solid archives created by
+         RAR versions older than 2.0, could fail in RAR 6.20 and 6.21.
+         It didn't affect extracting the entire archive, which was performed
+         correctly.
+
+   
+   Version 6.21
+
+   1. Bugs fixed:
+
+      a) if unencrypted file was stored after encrypted in the same
+         RAR archive and both files had been unpacked in the same extraction
+         command, RAR 6.20 failed to unpack the unencrypted file.
+
+   
+   Version 6.20
+
+   1. Fixed the security vulnerability allowing to create unpacked files
+      outside of destination directory and to copy files resided outside of
+      destination directory into the destination directory.
+
+      We are thankful to Simon Scannell from Google for reporting it.
+
+   2. If extraction command involves only a part of files in RAR archive,
+      the additional archive analysis is performed when starting extraction.
+      It helps to properly unpack file references even if reference source
+      is not selected. It works for most of RAR archives except for volumes
+      on multiple removable media and archives containing a very large
+      number of references.
+
+      Also in some cases such analysis may help to optimize the amount
+      of processing data when extracting individual files from
+      semi-solid archives created with -s<N> and -se switches.
+
+   3. Switch -ams or just -am together with archive modification commands
+      can be used to save the archive name and creation time.
+      
+      These saved parameters are displayed in header of "l" and "v" commands
+      output and can be restored with -amr switch combined with "ch" command,
+      such as "rar ch -amr arc.rar". If -amr is specified, "ch" ignores
+      other archive modification switches.
+
+      Restoring involves renaming an archive to original name and setting
+      the saved time as the archive modification time.
+
+   4. Faster RAR5 compression of poorly compressible data on modern CPUs
+      with 8 or more execution threads. This applies to all methods
+      except "Fastest", which performance remains the same.
+
+   5. "Repair" command efficiency is improved for shuffled data blocks
+      in recovery record protected RAR5 archives.
+         
+   6. If file size has grown after archiving when creating non-solid
+      RAR volumes, such file is stored without compression regardless of
+      volume number, provided that file isn't split between volumes.
+      Previously it worked only for files in the first volume.
+
+   7. When archiving from stdin with -si switch, RAR displays the current
+      amount of read bytes as the progress indicator.
+   
+   8. If wrong password is specified when adding files to encrypted
+      solid RAR5 archive, a password will be requested again.
+      Previous versions cancelled archiving in this case.
+
+   
    Version 6.12
 
    1. Security vulnerability allowing to create unpacked files outside
