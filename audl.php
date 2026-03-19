@@ -61,6 +61,16 @@ function resetProgress() {
 	document.getElementById('percent').innerHTML = '0%';
 	document.getElementById('progress').style.width = '0%';
 	document.getElementById('speed').innerHTML = '0 KB/s';
+	var headingText = document.getElementById('dl-heading-text');
+	var iconDownloading = document.getElementById('dl-icon-downloading');
+	var iconComplete = document.getElementById('dl-icon-complete');
+	var heading = document.getElementById('dl-heading');
+	var progressBar = document.getElementById('progress');
+	if (headingText) headingText.textContent = 'Downloading...';
+	if (iconDownloading) iconDownloading.style.display = 'inline';
+	if (iconComplete) iconComplete.style.display = 'none';
+	if (heading) heading.style.color = '';
+	if (progressBar) progressBar.style.background = '';
 	document.title = 'RAPIDLEECH PLUGMOD - Auto Download';
 }
 /* ]]> */

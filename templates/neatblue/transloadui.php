@@ -37,7 +37,18 @@ function pr(percent, received, speed) {
   document.getElementById('percent').innerHTML = `<b>${percent}%</b>`;
   document.getElementById('progress').style.width = `${percent}%`;
   document.getElementById('speed').innerHTML = `<b>${speedString}</b>`;
-  document.title = `${percent}% Downloaded`;
+
+  // Update when download is complete
+  if (parseFloat(percent) >= 100) {
+    var progressBar = document.getElementById('progress');
+    if (progressBar) {
+      progressBar.style.width = '100%';
+      progressBar.style.background = 'linear-gradient(90deg, #22c55e, #16a34a)';
+    }
+    document.title = 'Download Complete!';
+  } else {
+    document.title = `${percent}% Downloaded`;
+  }
 
   return true;
 }

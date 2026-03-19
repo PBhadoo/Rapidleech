@@ -1,14 +1,17 @@
 <div class="transloadui">
-    <h3 style="margin-bottom: 20px; color: var(--text-primary);">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -5px; margin-right: 8px;">
+    <h3 id="dl-heading" style="margin-bottom: 20px; color: var(--text-primary);">
+        <svg id="dl-icon-downloading" width="24" height="24" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -5px; margin-right: 8px;">
             <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
         </svg>
-        Downloading...
+        <svg id="dl-icon-complete" width="24" height="24" fill="currentColor" viewBox="0 0 24 24" style="vertical-align: -5px; margin-right: 8px; display: none;">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+        </svg>
+        <span id="dl-heading-text">Downloading...</span>
     </h3>
     
     <div class="progressouter" style="width: 100%; max-width: 400px; margin: 20px auto;">
         <div style="width: 100%;">
-            <div id="progress" class="progressdown" style="width: 0%;"></div>
+            <div id="progress" class="progressdown" style="width: 0%; transition: width 0.3s ease;"></div>
         </div>
     </div>
     
@@ -39,7 +42,27 @@ function pr(percent, received, speed) {
     document.getElementById('percent').innerHTML = `<b>${percent}%</b>`;
     document.getElementById('progress').style.width = `${percent}%`;
     document.getElementById('speed').innerHTML = `<b>${speedString}</b>`;
-    document.title = `${percent}% Downloaded`;
+
+    // Update heading and style when download is complete
+    if (parseFloat(percent) >= 100) {
+        var headingText = document.getElementById('dl-heading-text');
+        var iconDownloading = document.getElementById('dl-icon-downloading');
+        var iconComplete = document.getElementById('dl-icon-complete');
+        var heading = document.getElementById('dl-heading');
+        var progressBar = document.getElementById('progress');
+        
+        if (headingText) headingText.textContent = 'Download Complete!';
+        if (iconDownloading) iconDownloading.style.display = 'none';
+        if (iconComplete) iconComplete.style.display = 'inline';
+        if (heading) heading.style.color = 'var(--success, #22c55e)';
+        if (progressBar) {
+            progressBar.style.width = '100%';
+            progressBar.style.background = 'linear-gradient(90deg, #22c55e, #16a34a)';
+        }
+        document.title = 'Download Complete!';
+    } else {
+        document.title = `${percent}% Downloaded`;
+    }
 
     return true;
 }

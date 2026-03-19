@@ -223,29 +223,14 @@ function file_data_size_time($file) {
 
 function _create_list() {
 	$glist = array();
-	$user_token = defined('USER_TOKEN') ? USER_TOKEN : '';
 	if (($GLOBALS['options']['show_all'] === true) && (isset($_COOKIE['showAll']) && $_COOKIE['showAll'] == 1)) {
-		// "Show all" mode: scan the download directory but only show files owned by the current user
-		// We need to cross-reference with files.lst to check ownership
-		$owned_files = array();
-		if (@file_exists(CONFIG_DIR . 'files.lst') && ($flist = file(CONFIG_DIR . 'files.lst')) !== false) {
-			foreach ($flist as $line) {
-				if ($rec = @unserialize(trim($line))) {
-					// Files without an owner (legacy) are visible to everyone
-					if (empty($rec['owner']) || $rec['owner'] === $user_token) {
-						$owned_files[basename($rec['name'])] = true;
-					}
-				}
-			}
-		}
+		// "Show all" mode: scan the download directory and show all files to all users
 		$dir = dir(DOWNLOAD_DIR);
 		while(false !== ($file = $dir->read())) {
 			if ($file == '.' || $file == '..' || ($tmp = file_data_size_time(DOWNLOAD_DIR.$file)) === false) continue;
 			// Skip .tmp files, .meta files, .part files, and hidden files starting with .
 			if (preg_match('/\.tmp$/i', $file) || preg_match('/\.meta$/i', $file) || preg_match('/\.part$/i', $file) || preg_match('/^\./i', $file)) continue;
 			list($size, $time) = $tmp;
-			// Only show files owned by this user (or legacy unowned files found in list)
-			if (!empty($user_token) && !empty($owned_files) && !isset($owned_files[$file])) continue;
 			if (!is_array($GLOBALS['options']['forbidden_filetypes']) || !in_array(strtolower(strrchr($file, '.')), $GLOBALS['options']['forbidden_filetypes'])) {
 				$file = DOWNLOAD_DIR . $file;
 				while(isset($glist[$time])) $time++;
@@ -259,11 +244,6 @@ function _create_list() {
 			$listReformat = array();
 			foreach($glist as $key => $record) {
 				if ($record = @unserialize($record)) {
-					// Filter by owner: show only files belonging to this user or legacy files without owner
-					if (!empty($user_token) && !empty($record['owner']) && $record['owner'] !== $user_token) {
-						unset($glist[$key]);
-						continue;
-					}
 					$date = 0;
 					foreach($record as $field => $value) {
 						switch ($field) {

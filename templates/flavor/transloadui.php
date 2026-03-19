@@ -23,7 +23,13 @@ function pr(percent,received,speed){
     document.getElementById('percent').innerHTML='<b>'+percent+'%</b>';
     document.getElementById('progress').style.width=percent+'%';
     document.getElementById('speed').innerHTML='<b>'+ss+'</b>';
-    document.title=percent+'% Downloaded';
+    if(parseFloat(percent)>=100){
+        var pb=document.getElementById('progress');
+        if(pb){pb.style.width='100%';pb.style.background='linear-gradient(90deg,#22c55e,#16a34a)';}
+        document.title='Download Complete!';
+    }else{
+        document.title=percent+'% Downloaded';
+    }
     return true;
 }
 function mail(str,field){document.getElementById('mailPart.'+field).innerHTML=str;return true;}
