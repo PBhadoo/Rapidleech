@@ -46,6 +46,7 @@ header('Cache-Control: max-age=0, no-store, no-cache, must-revalidate, proxy-rev
 header('Pragma: no-cache');
 
 require_once(CLASS_DIR . 'other.php');
+require_once(CLASS_DIR . 'logger.php');
 
 // ============================================
 // USER TOKEN: Cookie-based file ownership

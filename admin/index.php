@@ -8,7 +8,10 @@
 $rootDir = dirname(__DIR__);
 $configDir = $rootDir . '/configs';
 define('RAPIDLEECH', 'yes');
+define('CONFIG_DIR', $configDir . '/');
+define('CLASS_DIR', $rootDir . '/classes/');
 require_once($configDir . '/config.php');
+require_once($rootDir . '/classes/logger.php');
 $ADMIN_USER = isset($options['admin_user']) ? $options['admin_user'] : 'admin';
 $ADMIN_PASS = isset($options['admin_pass']) ? $options['admin_pass'] : 'admin';
 
@@ -84,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 @unlink($filesDir . '/.mega_lock');
                 @unlink($filesDir . '/mega_dl.php');
             }
+            rl_log_admin('Clear all files', "$count files deleted");
             $message = "Cleared $count files from downloads folder.";
             $messageType = 'success';
             break;
@@ -91,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'save_accounts':
             $content = $_POST['accounts_content'] ?? '';
             if (@file_put_contents($accountsFile, $content)) {
+                rl_log_admin('Save accounts', 'Premium accounts updated');
                 $message = 'Premium accounts saved successfully.';
                 $messageType = 'success';
             } else {
@@ -102,6 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'save_config':
             $content = $_POST['config_content'] ?? '';
             if (@file_put_contents($configFile, $content)) {
+                rl_log_admin('Save config', 'Configuration updated');
                 $message = 'Configuration saved successfully. Reload the page to apply changes.';
                 $messageType = 'success';
             } else {
@@ -113,11 +119,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'run_command':
             $cmd = $_POST['command'] ?? '';
             if (!empty($cmd)) {
+                rl_log_admin('Shell command', $cmd);
                 $cmd = "cd $rootDir && " . $cmd . " 2>&1";
                 $output = shell_exec($cmd);
                 $message = "Command executed.";
                 $messageType = 'success';
             }
+            break;
+
+        case 'clear_logs':
+            rl_log_clear();
+            $message = 'Activity logs cleared.';
+            $messageType = 'success';
             break;
 
         case 'git_update':
@@ -388,8 +401,95 @@ label.check input{accent-color:#6366f1}
         <?php endif; ?>
     </div>
 
+    <!-- Activity Logs -->
+    <?php
+    $logFilter = $_GET['log_filter'] ?? '';
+    $logSearch = $_GET['log_search'] ?? '';
+    $logEntries = rl_log_read(200, $logFilter, $logSearch);
+    $logSize = rl_log_size();
+    ?>
+    <div class="card">
+        <h2>📋 Activity Logs</h2>
+        <h3>Download events, errors, and admin actions — Log size: <?php echo formatBytes($logSize); ?></h3>
+        
+        <!-- Filters -->
+        <div class="flex" style="margin-bottom:16px;gap:8px">
+            <a href="?log_filter=&log_search=<?php echo urlencode($logSearch); ?>" class="btn btn-ghost" style="padding:6px 14px;font-size:12px;<?php echo empty($logFilter) ? 'background:#6366f1;color:#fff;border-color:#6366f1;' : ''; ?>">All</a>
+            <a href="?log_filter=DOWNLOAD&log_search=<?php echo urlencode($logSearch); ?>" class="btn btn-ghost" style="padding:6px 14px;font-size:12px;<?php echo $logFilter==='DOWNLOAD' ? 'background:#3b82f6;color:#fff;border-color:#3b82f6;' : ''; ?>">⬇ Downloads</a>
+            <a href="?log_filter=COMPLETE&log_search=<?php echo urlencode($logSearch); ?>" class="btn btn-ghost" style="padding:6px 14px;font-size:12px;<?php echo $logFilter==='COMPLETE' ? 'background:#10b981;color:#fff;border-color:#10b981;' : ''; ?>">✅ Complete</a>
+            <a href="?log_filter=ERROR&log_search=<?php echo urlencode($logSearch); ?>" class="btn btn-ghost" style="padding:6px 14px;font-size:12px;<?php echo $logFilter==='ERROR' ? 'background:#ef4444;color:#fff;border-color:#ef4444;' : ''; ?>">❌ Errors</a>
+            <a href="?log_filter=ADMIN&log_search=<?php echo urlencode($logSearch); ?>" class="btn btn-ghost" style="padding:6px 14px;font-size:12px;<?php echo $logFilter==='ADMIN' ? 'background:#f59e0b;color:#fff;border-color:#f59e0b;' : ''; ?>">🔧 Admin</a>
+            <form method="GET" style="display:flex;gap:6px;margin-left:auto;">
+                <input type="hidden" name="log_filter" value="<?php echo htmlspecialchars($logFilter); ?>">
+                <input type="text" name="log_search" placeholder="Search logs..." value="<?php echo htmlspecialchars($logSearch); ?>" style="width:180px;padding:6px 10px;font-size:12px">
+                <button type="submit" class="btn btn-ghost" style="padding:6px 12px;font-size:12px">🔍</button>
+            </form>
+        </div>
+
+        <!-- Log Table -->
+        <div style="overflow-x:auto;max-height:500px;overflow-y:auto;border:1px solid #282d3e;border-radius:10px">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                    <tr style="background:#1e2231;position:sticky;top:0;z-index:1">
+                        <th style="padding:10px 12px;text-align:left;color:#606880;font-weight:600;border-bottom:1px solid #282d3e;white-space:nowrap">Time</th>
+                        <th style="padding:10px 12px;text-align:left;color:#606880;font-weight:600;border-bottom:1px solid #282d3e;width:80px">Level</th>
+                        <th style="padding:10px 12px;text-align:left;color:#606880;font-weight:600;border-bottom:1px solid #282d3e">Message</th>
+                        <th style="padding:10px 12px;text-align:left;color:#606880;font-weight:600;border-bottom:1px solid #282d3e;width:100px">IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($logEntries)): ?>
+                    <tr><td colspan="4" style="padding:24px;text-align:center;color:#606880">No log entries found.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($logEntries as $entry): ?>
+                    <?php
+                        $levelColors = array(
+                            'DOWNLOAD' => '#3b82f6',
+                            'COMPLETE' => '#10b981',
+                            'ERROR' => '#ef4444',
+                            'ADMIN' => '#f59e0b',
+                            'SYSTEM' => '#8b5cf6',
+                            'INFO' => '#606880',
+                        );
+                        $color = $levelColors[$entry['level']] ?? '#606880';
+                        $contextStr = '';
+                        if (!empty($entry['context'])) {
+                            $parts = array();
+                            foreach ($entry['context'] as $k => $v) {
+                                if (!empty($v)) $parts[] = '<span style="color:#606880">' . htmlspecialchars($k) . ':</span> ' . htmlspecialchars(is_string($v) ? (strlen($v) > 120 ? substr($v, 0, 120) . '...' : $v) : json_encode($v));
+                            }
+                            $contextStr = implode(' &nbsp;·&nbsp; ', $parts);
+                        }
+                    ?>
+                    <tr style="border-bottom:1px solid #1e2231">
+                        <td style="padding:8px 12px;color:#a0a8c0;white-space:nowrap;vertical-align:top"><?php echo htmlspecialchars($entry['time']); ?></td>
+                        <td style="padding:8px 12px;vertical-align:top"><span class="tag" style="background:<?php echo $color; ?>20;color:<?php echo $color; ?>"><?php echo htmlspecialchars($entry['level']); ?></span></td>
+                        <td style="padding:8px 12px;color:#e8ecf4;vertical-align:top">
+                            <div style="font-weight:500"><?php echo htmlspecialchars($entry['message']); ?></div>
+                            <?php if ($contextStr): ?>
+                            <div style="font-size:11px;margin-top:3px;color:#a0a8c0;word-break:break-all"><?php echo $contextStr; ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td style="padding:8px 12px;color:#606880;white-space:nowrap;vertical-align:top;font-family:monospace"><?php echo htmlspecialchars($entry['ip']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Clear Logs -->
+        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+            <span style="color:#606880;font-size:12px"><?php echo count($logEntries); ?> entries shown (max 200)</span>
+            <form method="POST" onsubmit="return confirm('Clear all activity logs?');" style="display:inline">
+                <input type="hidden" name="action" value="clear_logs">
+                <button type="submit" class="btn btn-danger" style="padding:6px 14px;font-size:12px">🗑️ Clear Logs</button>
+            </form>
+        </div>
+    </div>
+
     <div style="text-align:center;padding:20px;color:#606880;font-size:12px">
-        <a href="https://github.com/PBhadoo/Rapidleech" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;font-weight:700;">RapidLeech</a> v2.0.1 • Admin Panel • PHP <?php echo PHP_VERSION; ?> • <?php echo PHP_OS; ?>
+        <a href="https://github.com/PBhadoo/Rapidleech" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;font-weight:700;">RapidLeech</a> v2.0.2 • Admin Panel • PHP <?php echo PHP_VERSION; ?> • <?php echo PHP_OS; ?>
         <br>Built with <a href="https://www.anthropic.com/" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;">Claude Opus 4.6</a> by <a href="https://www.anthropic.com/" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;">Anthropic</a>
         <br>&copy; <?php echo date('Y'); ?> <a href="https://github.com/PBhadoo/Rapidleech" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;">PBhadoo</a>. All rights reserved.
     </div>

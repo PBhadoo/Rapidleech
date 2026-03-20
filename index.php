@@ -270,6 +270,11 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		$GLOBALS['current_download_id'] = generate_download_id();
 		register_download($GLOBALS['current_download_id'], $_GET['link'], basename($_GET['filename']), 0);
 		
+		// Log download start
+		if (function_exists('rl_log_download_start')) {
+			rl_log_download_start($_GET['link'], basename($_GET['filename']));
+		}
+		
 		if (isset($url['scheme']) && $url['scheme'] == 'ftp' && empty($_GET['proxy'])) {
 			require_once(CLASS_DIR . 'ftp.php');
 			$file = getftpurl($_GET['host'], defport($url), urldecode($_GET['path']), $pathWithName);
@@ -308,7 +313,12 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		}
 	} while ($redirectto && !$lastError);
 
-	if ($lastError) html_error(htmlspecialchars($lastError));
+	if ($lastError) {
+		if (function_exists('rl_log_download_error')) {
+			rl_log_download_error($_GET['link'] ?? '', $lastError);
+		}
+		html_error(htmlspecialchars($lastError));
+	}
 	elseif ($file['bytesReceived'] == $file['bytesTotal'] || $file['size'] == 'Unknown') {
 		// Auto-detect and fix file extension using magic bytes
 		if (function_exists('fixFileExtension') && !empty($file['file']) && is_file($file['file'])) {
@@ -323,6 +333,11 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		$file['date'] = time();
 
 		if (!write_file(CONFIG_DIR . 'files.lst', serialize(array('name' => $file['file'], 'size' => $file['size'], 'date' => $file['date'], 'link' => $_GET['link'], 'comment' => (!empty($_GET['comment']) ? str_replace(array("\r", "\n"), array('\r', '\n'), $_GET['comment']) : ''), 'owner' => (defined('USER_TOKEN') ? USER_TOKEN : ''))) . "\r\n", 0)) echo lang(9) . '<br />';
+
+		// Log download complete
+		if (function_exists('rl_log_download_complete')) {
+			rl_log_download_complete(basename($file['file']), $file['size'], $file['time'], $file['speed'] . ' KB/s');
+		}
 
 		if (!empty($_GET['email']) && !$options['disable_email']) {
 			require_once(CLASS_DIR . 'mail.php');
