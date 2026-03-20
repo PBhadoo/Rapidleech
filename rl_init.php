@@ -19,7 +19,7 @@ $fromaddr = 'RapidLeech';
 $dev_name = 'Development Stage';
 $rev_num = '43';
 $plusrar_v = '4.2';
-$rl_version = '2.0.1';
+$rl_version = '2.0.2';
 $PHP_SELF = $_SERVER['SCRIPT_NAME'];
 define('RAPIDLEECH', 'yes');
 define('ROOT_DIR', realpath('./'));
