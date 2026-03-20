@@ -483,6 +483,14 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 			fclose($fp);
 			return FALSE;
 		}
+		// When dechunk filter is active, Content-Length includes chunk overhead
+		// but bytesReceived is the actual data after dechunking, so they won't match.
+		// Also handle cases where Content-Length is 0 or missing (chunked-only transfer).
+		// Since we reached EOF successfully, the download is complete.
+		if ($bytesReceived > 0 && ($bytesReceived != $bytesTotal)) {
+			$bytesTotal = $bytesReceived;
+			$fileSize = bytesToKbOrMbOrGb($bytesReceived);
+		}
 	} else {
 		$length = trim(cut_str($header, "\nContent-Length: ", "\n"));
 		if (!$length || !is_numeric($length)) $length = -1;
