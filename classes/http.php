@@ -209,7 +209,7 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 		return false;
 	}
 
-	stream_set_timeout($fp, 120);
+	stream_set_timeout($fp, $saveToFile ? 600 : 120);
 
 	if ($saveToFile) {
 		if ($proxy) echo '<p>' . sprintf(lang(89), $proxyHost, $proxyPort) . '<br />GET: <b>' . htmlspecialchars($url) . "</b>...<br />\n";
