@@ -1385,8 +1385,8 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
     $bytesReceived = 0;
     
     for ($i = 0; $i < $numChunks; $i++) {
-        $chunkData = @file_get_contents($chunks[$i]['file']);
-        if ($chunkData === false) {
+        $chunkFp = @fopen($chunks[$i]['file'], 'rb');
+        if ($chunkFp === false) {
             flock($finalFp, LOCK_UN);
             fclose($finalFp);
             @unlink($saveToFile);
@@ -1397,11 +1397,17 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
                 @unlink($metaFile);
             }
             $lastError = 'Failed to read chunk ' . $i;
+            if (function_exists('rl_log')) rl_log('ERROR', 'Chunk merge failed', array('chunk' => $i, 'file' => $chunks[$i]['file']));
             return false;
         }
-        fwrite($finalFp, $chunkData);
-        $bytesReceived += strlen($chunkData);
-        unset($chunkData);
+        // Stream copy chunk to final file (memory-safe for large files)
+        while (!feof($chunkFp)) {
+            $buf = fread($chunkFp, 8 * 1024 * 1024); // 8MB buffer
+            if ($buf === false) break;
+            fwrite($finalFp, $buf);
+            $bytesReceived += strlen($buf);
+        }
+        fclose($chunkFp);
         @unlink($chunks[$i]['file']);
     }
     
