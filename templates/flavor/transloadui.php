@@ -1,7 +1,8 @@
 <div class="transloadui">
-    <h3 style="margin-bottom:16px;color:var(--fl-text);">
-        <svg width="22" height="22" fill="var(--fl-accent)" viewBox="0 0 24 24" style="vertical-align:-4px;margin-right:6px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-        Downloading&hellip;
+    <h3 id="dl-heading" style="margin-bottom:16px;color:var(--fl-text);">
+        <svg id="dl-icon-downloading" width="22" height="22" fill="var(--fl-accent)" viewBox="0 0 24 24" style="vertical-align:-4px;margin-right:6px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        <svg id="dl-icon-complete" width="22" height="22" fill="#22c55e" viewBox="0 0 24 24" style="vertical-align:-4px;margin-right:6px;display:none;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+        <span id="dl-heading-text">Downloading&hellip;</span>
     </h3>
     <div class="progressouter" style="width:100%;max-width:420px;margin:16px auto;">
         <div style="width:100%;"><div id="progress" class="progressdown" style="width:0%;"></div></div>
@@ -24,8 +25,12 @@ function pr(percent,received,speed){
     document.getElementById('progress').style.width=percent+'%';
     document.getElementById('speed').innerHTML='<b>'+ss+'</b>';
     if(parseFloat(percent)>=100){
+        var ht=document.getElementById('dl-heading-text');if(ht)ht.textContent='Download Complete!';
+        var id=document.getElementById('dl-icon-downloading');if(id)id.style.display='none';
+        var ic=document.getElementById('dl-icon-complete');if(ic)ic.style.display='inline';
+        var hd=document.getElementById('dl-heading');if(hd)hd.style.color='#22c55e';
         var pb=document.getElementById('progress');
-        if(pb){pb.style.width='100%';pb.style.background='linear-gradient(90deg,#22c55e,#16a34a)';}
+        if(pb){pb.style.width='100%';pb.style.background='linear-gradient(90deg,#22c55e,#16a34a)';pb.style.animation='none';}
         document.title='Download Complete!';
     }else{
         document.title=percent+'% Downloaded';
