@@ -566,7 +566,7 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('Output file: ' . $filename);
 		
 		// Wrap everything in centered table
-		echo '<table width="900" align="center" style="margin-left: auto; margin-right: auto; margin-top: 20px; margin-bottom: 20px;"><tr><td>';
+		echo '<table width="900" style="margin-left: auto; margin-right: auto; margin-top: 20px; margin-bottom: 20px;"><tr><td>';
 		
 		// Show progress (debug will be shown at bottom only)
 		echo '<div style="margin: 20px auto; padding: 15px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; color: #000; text-align: left;">';
@@ -688,7 +688,7 @@ class pornhub_com extends DownloadClass {
 	 */
 	private function showQualitySelector($originalLink, $viewkey, $title, $availableQualities) {
 		// Outer wrapper to center in page using table
-		echo '<table width="800" align="center" style="margin-left: auto; margin-right: auto; margin-top: 20px; margin-bottom: 20px;"><tr><td style="padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); color: #000;">';
+		echo '<table width="800" style="margin-left: auto; margin-right: auto; margin-top: 20px; margin-bottom: 20px;"><tr><td style="padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); color: #000;">';
 		echo '<h2 style="color: #333; margin-top: 0;">📹 Select Video Quality</h2>';
 		echo '<h3 style="color: #666; font-weight: normal; margin-bottom: 30px;">' . htmlspecialchars($title) . '</h3>';
 		

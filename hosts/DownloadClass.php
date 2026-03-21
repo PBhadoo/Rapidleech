@@ -12,7 +12,7 @@ class DownloadClass {
 
 	public function __construct($echo = true) {
 		if (!$echo) return;
-		echo('<table width="600" align="center">');
+		echo('<table width="800" style="margin-left: auto; margin-right: auto;">');
 		echo('<tr>');
 		echo('<td align="center">');
 		echo('<div id="mesg" width="100%" align="center">' . lang(300) . '</div>');
