@@ -6,53 +6,116 @@ if (!defined('RAPIDLEECH')) {
 
 /**
  * Transfer.it Download Plugin
- * Transfer.it is powered by MEGA's API. This plugin extracts the transfer ID,
- * queries the MEGA API for file metadata, and converts files into mega.nz links
- * for the existing mega_co_nz plugin to handle.
+ * Transfer.it is powered by MEGA's infrastructure. Files are AES-CTR encrypted.
+ * 
+ * API Flow:
+ * 1. POST gmf to g.api.mega.co.nz -> get config
+ * 2. POST xi to API server -> get transfer info (name, size, server)
+ * 3. POST f to API server with x=transferId -> get file nodes with raw keys
+ * 4. POST g to API server with x=transferId -> get download URL
+ * 5. Download with AES-CTR decryption (same as MEGA)
  */
 class transfer_it extends DownloadClass {
 	private $seqno;
+	private $useOpenSSL;
+	private $useOldFilter;
+	private $apiServer;
 
 	public function Download($link) {
+		$this->checkCryptDependences();
+		$this->seqno = mt_rand();
+
 		// Extract transfer ID from URL
-		// Formats: transfer.it/t/ID or transfer.it/t/ID/filename
-		if (!preg_match('@transfer\.it/t/([a-zA-Z0-9_\-]+)@i', $link, $match)) {
+		// Formats: 
+		//   transfer.it/t/ID              -> list/download all files
+		//   transfer.it/t/ID/HANDLE#KEY   -> direct single file (from auto-downloader)
+		if (!preg_match('@transfer\.it/t/([a-zA-Z0-9_\-]+)(?:/([a-zA-Z0-9_\-]+))?@i', $link, $match)) {
 			html_error('Invalid transfer.it link. Expected format: https://transfer.it/t/TRANSFER_ID');
 		}
 		$transferId = $match[1];
+		$directHandle = !empty($match[2]) ? $match[2] : null;
+		$directKey = null;
 
-		$this->seqno = mt_rand();
+		// Check for key in URL fragment (#key)
+		if (preg_match('@#(.+)$@', $link, $km)) {
+			$directKey = $km[1];
+		}
+
 		$this->changeMesg(lang(300) . '<br />Transfer.it plugin (powered by MEGA)');
 
-		// Step 1: Get the API server for this transfer
-		$apiServer = $this->getApiServer($transferId);
+		// If we have both handle and key from auto-downloader, download directly
+		if ($directHandle && $directKey) {
+			$keyA32 = $this->base64_to_a32($directKey);
+			if (count($keyA32) >= 8) {
+				$aesKey = array(
+					$keyA32[0] ^ $keyA32[4],
+					$keyA32[1] ^ $keyA32[5],
+					$keyA32[2] ^ $keyA32[6],
+					$keyA32[3] ^ $keyA32[7]
+				);
+				// Decrypt attributes via g API to get filename
+				$dlReply = $this->apiReq(
+					array('a' => 'g', 'g' => 1, 'n' => $directHandle, 'ssl' => 0),
+					$transferId
+				);
+				if (!is_numeric($dlReply[0]) && !empty($dlReply[0]['g'])) {
+					$fname = 'transfer_it_file';
+					if (!empty($dlReply[0]['at'])) {
+						$attr = $this->dec_attr($this->base64url_decode($dlReply[0]['at']), $aesKey);
+						if ($attr && !empty($attr['n'])) $fname = $attr['n'];
+					}
+					$this->RedirectDownload($dlReply[0]['g'], $fname, 0, 0, $link, 0, 0, array('T8[fkey]' => $directKey));
+					return;
+				}
+				if (is_numeric($dlReply[0])) $this->checkErr($dlReply[0]);
+			}
+		}
 
-		// Step 2: Fetch file list from MEGA API with transfer context
+		// Step 1: Get transfer info via xi call
+		$xiReply = $this->apiReqGlobal(array('a' => 'xi', 'xh' => $transferId));
+		if (is_numeric($xiReply[0])) $this->checkErr($xiReply[0]);
+
+		// Step 2: Fetch file list with x=transferId
 		$files = $this->apiReq(
-			array('a' => 'f', 'c' => 1, 'r' => 1),
-			$apiServer,
+			array('a' => 'f', 'c' => 1, 'r' => 1, 'xnc' => 1),
 			$transferId
 		);
 
-		if (is_numeric($files[0])) {
-			$this->checkErr($files[0]);
-		}
+		if (is_numeric($files[0])) $this->checkErr($files[0]);
 		if (empty($files[0]['f']) || !is_array($files[0]['f'])) {
 			html_error('No files found in this transfer, or the transfer has expired.');
 		}
 
 		// Step 3: Parse the file tree
 		$nodes = $files[0]['f'];
-		$rootNode = null;
 		$fileNodes = array();
 
 		foreach ($nodes as $node) {
-			if ($node['t'] == 1 && empty($node['p'])) {
-				// Root folder node - contains the master key
-				$rootNode = $node;
-			} elseif ($node['t'] == 0) {
-				// File node
-				$fileNodes[] = $node;
+			if ($node['t'] == 0) {
+				// File node - key is raw (NOT encrypted with folder key)
+				$rawKey = $node['k'];
+				$keyA32 = $this->base64_to_a32($rawKey);
+
+				if (count($keyA32) < 8) continue;
+
+				// Derive AES key by XOR-ing halves
+				$aesKey = array(
+					$keyA32[0] ^ $keyA32[4],
+					$keyA32[1] ^ $keyA32[5],
+					$keyA32[2] ^ $keyA32[6],
+					$keyA32[3] ^ $keyA32[7]
+				);
+
+				// Decrypt attributes to get filename
+				$attr = $this->dec_attr($this->base64url_decode($node['a']), $aesKey);
+				if ($attr === false || empty($attr['n'])) continue;
+
+				$fileNodes[] = array(
+					'handle' => $node['h'],
+					'name' => $attr['n'],
+					'size' => isset($node['s']) ? $node['s'] : 0,
+					'key_b64' => $rawKey,
+				);
 			}
 		}
 
@@ -60,110 +123,113 @@ class transfer_it extends DownloadClass {
 			html_error('No downloadable files found in this transfer.');
 		}
 
-		if (empty($rootNode) || empty($rootNode['k'])) {
-			html_error('Transfer key not found. The transfer may have expired or is invalid.');
-		}
-
-		// Step 4: Decode root folder key  
-		// Transfer.it root keys can be in format "handle:key" or just "key"
-		$rootKeyStr = $rootNode['k'];
-		if (strpos($rootKeyStr, ':') !== false) {
-			list(, $rootKeyStr) = explode(':', $rootKeyStr, 2);
-		}
-		// Also handle slash-separated multi-keys
-		if (strpos($rootKeyStr, '/') !== false) {
-			$parts = explode('/', $rootKeyStr);
-			foreach ($parts as $part) {
-				if (strpos($part, ':') !== false) {
-					list(, $rootKeyStr) = explode(':', $part, 2);
-					break;
-				}
-			}
-		}
-		$folderKey = $this->base64_to_a32($rootKeyStr);
-
-		// Step 5: For each file, decrypt the key and build download info
-		$downloadFiles = array();
-		foreach ($fileNodes as $fnode) {
-			$fileKey = $this->decryptFileKey($fnode['k'], $folderKey);
-			if ($fileKey === false) continue;
-
-			$attr = $this->decryptAttr($fnode['a'], $fileKey);
-			if ($attr === false || empty($attr['n'])) continue;
-
-			$downloadFiles[] = array(
-				'handle' => $fnode['h'],
-				'name' => $attr['n'],
-				'size' => isset($fnode['s']) ? $fnode['s'] : 0,
-				'key_b64' => $this->a32_to_base64($fileKey),
-			);
-		}
-
-		if (empty($downloadFiles)) {
-			html_error('Could not decrypt any files from this transfer. Keys may be invalid.');
-		}
-
-		// Step 6: If single file, download directly. If multiple, send to auto-downloader.
-		if (count($downloadFiles) == 1) {
-			$f = $downloadFiles[0];
-			// Request download URL from MEGA API
-			$dlReply = $this->apiReq(
-				array('a' => 'g', 'g' => 1, 'n' => $f['handle'], 'ssl' => 0),
-				$apiServer,
-				$transferId
-			);
-			if (is_numeric($dlReply[0])) $this->checkErr($dlReply[0]);
-			if (empty($dlReply[0]['g'])) html_error('Could not get download URL from MEGA.');
-
-			// Redirect to download with MEGA decryption key
-			$this->RedirectDownload($dlReply[0]['g'], $f['name'], 0, 0, $link, 0, 0, array('T8[fkey]' => $f['key_b64']));
+		// Step 4: Download
+		if (count($fileNodes) == 1) {
+			$this->downloadFile($fileNodes[0], $transferId, $link);
 		} else {
-			// Multiple files: build mega.nz compatible links for auto-downloader
-			// We'll use a custom approach: download each file via the MEGA API
+			// Multiple files
 			echo '<div style="text-align:center;padding:20px;">';
-			echo '<h3>Transfer.it - ' . count($downloadFiles) . ' files found</h3>';
-			echo '<p>Total: ' . $this->formatSize(array_sum(array_column($downloadFiles, 'size'))) . '</p>';
+			echo '<h3>Transfer.it - ' . count($fileNodes) . ' files found</h3>';
+			echo '<p>Total: ' . $this->formatSize(array_sum(array_column($fileNodes, 'size'))) . '</p>';
 			echo '<table class="filelist" style="width:100%;margin:20px 0;">';
 			echo '<tr class="flisttblhdr"><td><b>Filename</b></td><td><b>Size</b></td></tr>';
-			foreach ($downloadFiles as $f) {
+			foreach ($fileNodes as $f) {
 				echo '<tr class="flistmouseoff"><td>' . htmlspecialchars($f['name']) . '</td><td>' . $this->formatSize($f['size']) . '</td></tr>';
 			}
 			echo '</table>';
 			echo '</div>';
 
-			// Build links array for auto-downloader
-			// Each link encodes the transfer info needed to download
+			// Build links for auto-downloader - encode handle and key in URL
 			$links = array();
-			foreach ($downloadFiles as $f) {
-				// Encode as a special transfer.it direct link that this plugin can parse
+			foreach ($fileNodes as $f) {
 				$links[] = 'https://transfer.it/t/' . $transferId . '/' . urlencode($f['handle']) . '#' . $f['key_b64'];
 			}
 			$this->moveToAutoDownloader($links);
 		}
 	}
 
-	private function getApiServer($transferId) {
-		// First, query the global MEGA API to get the right server
-		$page = $this->GetPage(
-			'https://g.api.mega.co.nz/cs?id=' . ($this->seqno++) . '&v=3&lang=en&domain=transferit',
-			0,
-			json_encode(array(array('a' => 'gmf'))),
-			"https://transfer.it/\r\nContent-Type: application/json"
+	private function downloadFile($file, $transferId, $link) {
+		// Request download URL from MEGA API
+		$dlReply = $this->apiReq(
+			array('a' => 'g', 'g' => 1, 'n' => $file['handle'], 'ssl' => 0),
+			$transferId
 		);
-		list($header, $body) = array_map('trim', explode("\r\n\r\n", $page, 2));
+		if (is_numeric($dlReply[0])) $this->checkErr($dlReply[0]);
+		if (!empty($dlReply[0]['e']) && is_numeric($dlReply[0]['e'])) $this->checkErr($dlReply[0]['e']);
+		if (empty($dlReply[0]['g'])) html_error('Could not get download URL from transfer.it/MEGA.');
 
-		// Try to extract server from response, fallback to default
-		$reply = @json_decode($body, true);
-		if (!empty($reply[0]) && is_string($reply[0])) {
-			return $reply[0]; // Server URL
-		}
-
-		// Fallback: use the transfer-specific endpoint
-		return 'https://g.api.mega.co.nz';
+		// Pass the full key (8 int32s as base64) for AES-CTR decryption in CheckBack
+		$this->RedirectDownload($dlReply[0]['g'], $file['name'], 0, 0, $link, 0, 0, array('T8[fkey]' => $file['key_b64']));
 	}
 
-	private function apiReq($attr, $server, $transferId) {
-		$url = $server . '/cs?id=' . ($this->seqno++) . '&v=3&lang=en&domain=transferit&x=' . urlencode($transferId) . '&bc=1';
+	/**
+	 * CheckBack is called by the download framework after HTTP headers are received.
+	 * Sets up AES-CTR stream decryption filter (same as MEGA).
+	 */
+	public function CheckBack($header) {
+		if (($statuscode = intval(substr($header, 9, 3))) != 200) {
+			switch ($statuscode) {
+				case 509: html_error('[Transfer.it] Transfer quota exceeded.');
+				case 503: html_error('[Transfer.it] Too many connections.');
+				case 403: html_error('[Transfer.it] Link expired.');
+				case 404: html_error('[Transfer.it] File not found.');
+				default : html_error('[Transfer.it][HTTP] ' . trim(substr($header, 9, strpos($header, "\n") - 8)));
+			}
+		}
+
+		global $fp, $sFilters;
+		if (empty($fp) || !is_resource($fp)) html_error("Error: Your rapidleech version is outdated.");
+		$this->checkCryptDependences();
+
+		// Get the file key from URL params
+		if (!empty($_GET['T8']['fkey'])) {
+			$key = $this->base64_to_a32(urldecode($_GET['T8']['fkey']));
+		} else {
+			// Try to extract from referer URL fragment
+			if (preg_match('@transfer\.it/t/[^/]+/[^#]+#(.+)$@', $_GET['referer'], $m)) {
+				$key = $this->base64_to_a32(urldecode($m[1]));
+			} else {
+				html_error("[Transfer.it] File key not found.");
+			}
+		}
+
+		if (count($key) < 8) html_error("[Transfer.it] Invalid file key.");
+
+		// IV: elements [4,5] from the full key, plus two zeros (CTR nonce)
+		$iv = array($key[4], $key[5], 0, 0);
+		// AES key: XOR of the two halves
+		$aesKey = array($key[0] ^ $key[4], $key[1] ^ $key[5], $key[2] ^ $key[6], $key[3] ^ $key[7]);
+
+		$opts = array(
+			'iv' => $this->a32_to_str($iv),
+			'key' => $this->a32_to_str($aesKey)
+		);
+
+		// Register AES-CTR decryption stream filter
+		$filterClass = $this->useOldFilter ? 'Th3822_MegaDlDecrypt_Old' : 'Th3822_MegaDlDecrypt';
+		if (!in_array('MegaDlDecrypt', stream_get_filters())) {
+			if (!stream_filter_register('MegaDlDecrypt', $filterClass)) {
+				html_error('Error: Cannot register decryption filter.');
+			}
+		}
+
+		if (!isset($sFilters) || !is_array($sFilters)) $sFilters = array();
+		if (empty($sFilters['MegaDlDecrypt'])) {
+			$sFilters['MegaDlDecrypt'] = stream_filter_append($fp, 'MegaDlDecrypt', STREAM_FILTER_READ, $opts);
+		}
+		if (!$sFilters['MegaDlDecrypt']) html_error('Error: Failed to initialize decryption filter.');
+	}
+
+	// ============================================
+	// API Methods
+	// ============================================
+
+	/**
+	 * Global API call (to g.api.mega.co.nz without transfer context)
+	 * Used for xi (transfer info) which also tells us which API server to use
+	 */
+	private function apiReqGlobal($attr) {
+		$url = 'https://g.api.mega.co.nz/cs?id=' . ($this->seqno++) . '&v=3&lang=en&domain=transferit&bc=1';
 
 		$page = $this->GetPage(
 			$url,
@@ -172,6 +238,48 @@ class transfer_it extends DownloadClass {
 			"https://transfer.it/\r\nContent-Type: text/plain;charset=UTF-8"
 		);
 
+		list($header, $body) = array_map('trim', explode("\r\n\r\n", $page, 2));
+
+		// Extract the API server from the response URL redirect or use default
+		// The actual server is determined by the response - we use the server from the URL
+		if (preg_match('@https?://([a-z0-9]+\.api\.mega\.co\.nz)@i', $url, $sm)) {
+			$this->apiServer = 'https://' . $sm[1];
+		}
+
+		// Also try to detect server from redirect or just use g.api
+		$this->apiServer = 'https://g.api.mega.co.nz';
+
+		if (is_numeric(trim($body))) return array(intval(trim($body)));
+		$result = @json_decode($body, true);
+		if ($result === null) html_error('Invalid API response.');
+		return $result;
+	}
+
+	/**
+	 * Transfer-specific API call (with x=transferId parameter)
+	 */
+	private function apiReq($attr, $transferId) {
+		$try = 0;
+		do {
+			if ($try > 0) sleep(2);
+			$ret = $this->doApiReq($attr, $transferId);
+			$try++;
+		} while ($try < 6 && isset($ret[0]) && $ret[0] === -3);
+		return $ret;
+	}
+
+	private function doApiReq($attr, $transferId) {
+		$url = 'https://g.api.mega.co.nz/cs?id=' . ($this->seqno++) 
+			 . '&v=3&lang=en&domain=transferit&x=' . urlencode($transferId) . '&bc=1';
+
+		$page = $this->GetPage(
+			$url,
+			0,
+			json_encode(array($attr)),
+			"https://transfer.it/\r\nContent-Type: text/plain;charset=UTF-8"
+		);
+
+		if (in_array(intval(substr($page, 9, 3)), array(500, 503))) return array(-3);
 		list($header, $body) = array_map('trim', explode("\r\n\r\n", $page, 2));
 
 		if (is_numeric(trim($body))) return array(intval(trim($body)));
@@ -198,8 +306,22 @@ class transfer_it extends DownloadClass {
 	}
 
 	// ============================================
-	// MEGA Crypto Helper Functions
+	// Crypto Functions (same as MEGA)
 	// ============================================
+
+	private function checkCryptDependences() {
+		$this->useOpenSSL = (version_compare(PHP_VERSION, '5.4.0', '>=') && extension_loaded('openssl') && in_array('aes-128-cbc', ($ossl_ciphers = openssl_get_cipher_methods()), true));
+
+		if (!$this->useOpenSSL || !in_array('aes-128-ctr', $ossl_ciphers, true)) {
+			$this->useOldFilter = true;
+			if (!extension_loaded('mcrypt') || !in_array('rijndael-128', mcrypt_list_algorithms(), true)) {
+				html_error("OpenSSL / Mcrypt module isn't installed or doesn't support the needed encryption.");
+			}
+		} else {
+			$this->useOldFilter = false;
+		}
+	}
+
 	private function str_to_a32($b) {
 		$b = str_pad($b, 4 * ceil(strlen($b) / 4), "\0");
 		return array_values(unpack('N*', $b));
@@ -227,54 +349,16 @@ class transfer_it extends DownloadClass {
 	}
 
 	private function aes_cbc_decrypt($data, $key) {
-		$data = str_pad($data, 16 * ceil(strlen($data) / 16), "\0");
-		return openssl_decrypt($data, 'aes-128-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
-	}
-
-	private function aes_cbc_decrypt_a32($data, $key) {
-		return $this->str_to_a32($this->aes_cbc_decrypt($this->a32_to_str($data), $this->a32_to_str($key)));
-	}
-
-	private function decrypt_key($a, $key) {
-		$x = array();
-		for ($i = 0; $i < count($a); $i += 4) {
-			$x = array_merge($x, $this->aes_cbc_decrypt_a32(array_slice($a, $i, 4), $key));
+		if ($this->useOpenSSL) {
+			$data = str_pad($data, 16 * ceil(strlen($data) / 16), "\0");
+			return openssl_decrypt($data, 'aes-128-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+		} else {
+			return mcrypt_decrypt(MCRYPT_RIJNDAEL_128, $key, $data, MCRYPT_MODE_CBC, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
 		}
-		return $x;
 	}
 
-	private function decryptFileKey($keyStr, $folderKey) {
-		// File keys in transfer.it can be in format "handle:key", "handle:key/handle:key" or just "key"
-		if (strpos($keyStr, '/') !== false || strpos($keyStr, ':') !== false) {
-			$parts = explode('/', $keyStr);
-			$found = '';
-			foreach ($parts as $part) {
-				if (strpos($part, ':') !== false) {
-					list(, $found) = explode(':', $part, 2);
-					break;
-				}
-			}
-			if (!empty($found)) $keyStr = $found;
-		}
-
-		if (empty($keyStr)) return false;
-
-		$encKey = $this->base64_to_a32($keyStr);
-		$decKey = $this->decrypt_key($encKey, $folderKey);
-
-		if (count($decKey) < 8) return false;
-
-		// XOR the two halves to get the actual file key
-		return array(
-			$decKey[0] ^ $decKey[4],
-			$decKey[1] ^ $decKey[5],
-			$decKey[2] ^ $decKey[6],
-			$decKey[3] ^ $decKey[7]
-		);
-	}
-
-	private function decryptAttr($attrB64, $key) {
-		$attr = trim($this->aes_cbc_decrypt($this->base64url_decode($attrB64), $this->a32_to_str($key)));
+	private function dec_attr($attr, $key) {
+		$attr = trim($this->aes_cbc_decrypt($attr, $this->a32_to_str($key)));
 		if (substr($attr, 0, 6) != 'MEGA{"') return false;
 		$attr = substr($attr, 4);
 		$attr = substr($attr, 0, strrpos($attr, '}') + 1);
