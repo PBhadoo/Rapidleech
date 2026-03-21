@@ -188,7 +188,9 @@ class pornhub_com extends DownloadClass {
 				
 				// If no quality selected, show quality selector
 				if ($selectedQuality == 0 && count($availableQualities) > 1) {
-					$this->showQualitySelector($link, $title, $availableQualities);
+					// Build RapidLeech download URL (not the original pornhub URL)
+					$currentUrl = $_SERVER['REQUEST_URI'];
+					$this->showQualitySelector($currentUrl, $title, $availableQualities);
 					exit;
 				}
 				
@@ -686,15 +688,17 @@ class pornhub_com extends DownloadClass {
 	/**
 	 * Show quality selector UI
 	 */
-	private function showQualitySelector($originalUrl, $title, $availableQualities) {
-		echo '<div style="max-width: 800px; margin: 50px auto; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">';
+	private function showQualitySelector($currentUrl, $title, $availableQualities) {
+		echo '<div style="max-width: 800px; margin: 50px auto; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); color: #000;">';
 		echo '<h2 style="color: #333; margin-top: 0;">📹 Select Video Quality</h2>';
 		echo '<h3 style="color: #666; font-weight: normal; margin-bottom: 30px;">' . htmlspecialchars($title) . '</h3>';
 		
 		echo '<div style="margin-bottom: 30px;">';
 		krsort($availableQualities); // Sort descending (1080p first)
 		foreach ($availableQualities as $q => $url) {
-			$downloadUrl = $originalUrl . '&ph_quality=' . $q;
+			// Add quality parameter to current RapidLeech URL
+			$separator = (strpos($currentUrl, '?') !== false) ? '&' : '?';
+			$downloadUrl = $currentUrl . $separator . 'ph_quality=' . $q;
 			$sizeEstimate = '';
 			switch($q) {
 				case 1080: $sizeEstimate = '~200-400 MB'; break;
