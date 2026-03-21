@@ -165,29 +165,78 @@ class pornhub_com extends DownloadClass {
 			}
 		}
 		
-		// Method 4: Extract mp4 URLs from HLS m3u8 streams (NEW - for server environments)
+		// Method 4: Extract and parse HLS m3u8 streams to get actual video URLs
 		if (empty($downloadUrl)) {
-			$this->addDebug('Method 4: Looking for HLS m3u8 streams with embedded mp4 URLs...');
+			$this->addDebug('Method 4: Looking for HLS m3u8 streams...');
 			// Pattern: "videoUrl":"https:\/\/ev-h.phncdn.com\/hls\/.../1080P_4000K_xxx.mp4\/master.m3u8?..."
 			// Match escaped slashes in JSON: \/
-			if (preg_match_all('@"videoUrl":"(https?:\\\\/\\\\/[^"]+?\\\\/(\d+)P_[^"\\\\]+\.mp4)\\\\/master\.m3u8@', $page, $matches, PREG_SET_ORDER)) {
-				$this->addDebug('Found ' . count($matches) . ' HLS streams with mp4 paths');
+			if (preg_match_all('@"videoUrl":"(https?:\\\\/\\\\/[^"]+?\\\\/(\d+)P_[^"\\\\]+\.mp4\\\\/master\.m3u8[^"]*)"@', $page, $matches, PREG_SET_ORDER)) {
+				$this->addDebug('Found ' . count($matches) . ' HLS m3u8 streams');
 				$bestQuality = 0;
+				$bestM3u8Url = '';
+				
+				// Find the best quality m3u8
 				foreach ($matches as $match) {
-					$url = stripcslashes($match[1]); // Extract just the mp4 URL without /master.m3u8 and unescape
+					$m3u8Url = stripcslashes($match[1]); // Unescape the URL
 					$q = intval($match[2]); // Quality from URL
-					$this->addDebug('  - Quality ' . $q . 'p: ' . $url);
+					$this->addDebug('  - Quality ' . $q . 'p m3u8: ' . substr($m3u8Url, 0, 100) . '...');
 					if ($q > $bestQuality) {
 						$bestQuality = $q;
-						$downloadUrl = $url;
+						$bestM3u8Url = $m3u8Url;
 						$quality = strval($q);
 					}
 				}
-				if (!empty($downloadUrl)) {
-					$this->addDebug('Method 4 SUCCESS: Selected ' . $quality . 'p (extracted from HLS)');
+				
+				if (!empty($bestM3u8Url)) {
+					$this->addDebug('Fetching m3u8 playlist for ' . $quality . 'p...');
+					
+					// Fetch the m3u8 playlist
+					$m3u8Content = $this->GetPage($bestM3u8Url, 0, 0, $videoUrl);
+					$this->addDebug('m3u8 response length: ' . strlen($m3u8Content) . ' bytes');
+					$this->addDebug('m3u8 content (first 500 chars): ' . substr($m3u8Content, 0, 500));
+					
+					// Parse m3u8 to find the actual mp4 URL or segments
+					// Look for the highest bitrate variant
+					if (preg_match('@#EXT-X-STREAM-INF:[^\n]*\n([^\n]+\.m3u8)@', $m3u8Content, $variantMatch)) {
+						$variantUrl = $variantMatch[1];
+						// If relative URL, make it absolute
+						if (strpos($variantUrl, 'http') !== 0) {
+							$baseUrl = preg_replace('@/[^/]*$@', '/', $bestM3u8Url);
+							$variantUrl = $baseUrl . $variantUrl;
+						}
+						$this->addDebug('Found variant playlist: ' . $variantUrl);
+						
+						// Fetch the variant playlist
+						$variantContent = $this->GetPage($variantUrl, 0, 0, $videoUrl);
+						$this->addDebug('Variant playlist length: ' . strlen($variantContent) . ' bytes');
+						
+						// Extract .ts segments or direct mp4 URL
+						if (preg_match('@#EXTINF:[^\n]*\n([^\n]+\.(ts|mp4))@', $variantContent, $segmentMatch)) {
+							$segmentUrl = $segmentMatch[1];
+							// If relative URL, make it absolute
+							if (strpos($segmentUrl, 'http') !== 0) {
+								$baseUrl = preg_replace('@/[^/]*$@', '/', $variantUrl);
+								$segmentUrl = $baseUrl . $segmentUrl;
+							}
+							
+							// If it's a direct mp4, use it
+							if (strpos($segmentUrl, '.mp4') !== false) {
+								$downloadUrl = $segmentUrl;
+								$this->addDebug('Method 4 SUCCESS: Found direct mp4 URL in variant playlist');
+							} else {
+								$this->addDebug('Method 4: HLS uses segments (.ts files), not supported for direct download');
+							}
+						}
+					} else {
+						// Try direct mp4 path (remove /master.m3u8)
+						$directMp4 = preg_replace('@/master\.m3u8.*$@', '', $bestM3u8Url);
+						$this->addDebug('Trying direct mp4 path: ' . $directMp4);
+						$downloadUrl = $directMp4;
+						$this->addDebug('Method 4: Using direct mp4 path (experimental)');
+					}
 				}
 			} else {
-				$this->addDebug('Method 4: No HLS streams with mp4 paths found');
+				$this->addDebug('Method 4: No HLS streams found');
 			}
 		}
 		
