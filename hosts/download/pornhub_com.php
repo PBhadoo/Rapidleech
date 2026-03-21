@@ -237,11 +237,27 @@ class pornhub_com extends DownloadClass {
 						$variantContent = trim($variantContent);
 						$this->addDebug('Variant playlist full content: ' . $variantContent);
 						
-						// Use the variant m3u8 URL itself as the download URL
-						// Download managers like IDM can handle HLS m3u8 playlists automatically
-						$downloadUrl = $variantUrl;
-						$this->addDebug('Method 4 SUCCESS: Using variant m3u8 URL for HLS download: ' . $variantUrl);
-						$this->addDebug('Note: This is an HLS stream. The downloader will fetch and merge segments automatically.');
+						// Check if variant playlist has segments
+						if (preg_match_all('@#EXTINF:[^\n]*\n([^\n]+)@', $variantContent, $segMatches)) {
+							$segments = $segMatches[1];
+							$this->addDebug('Found ' . count($segments) . ' segments in variant playlist');
+							
+							// Make first segment URL absolute
+							$firstSegment = $segments[0];
+							if (strpos($firstSegment, 'http') !== 0) {
+								$baseUrl = preg_replace('@/[^/]*$@', '/', $variantUrl);
+								$firstSegment = $baseUrl . $firstSegment;
+							}
+							$this->addDebug('First segment URL: ' . $firstSegment);
+							
+							// For HLS streams, we need to pass the variant m3u8 URL
+							// but flag it as HLS so the downloader handles segments
+							$downloadUrl = $variantUrl;
+							$this->addDebug('Method 4 SUCCESS: Using HLS variant URL: ' . $variantUrl);
+							$this->addDebug('HLS Stream with ' . count($segments) . ' segments will be downloaded and merged');
+						} else {
+							$this->addDebug('Method 4: Could not find segments in variant playlist');
+						}
 					} else {
 						$this->addDebug('Method 4: HLS video uses segmented streaming (.ts files)');
 						$this->addDebug('NOTE: Segmented HLS videos cannot be downloaded directly.');
@@ -304,8 +320,18 @@ class pornhub_com extends DownloadClass {
 		
 		$this->addDebug('--- Final download details ---');
 		$this->addDebug('Download URL: ' . substr($downloadUrl, 0, 150) . '...');
+		$this->addDebug('Full Download URL: ' . $downloadUrl);
 		$this->addDebug('Filename: ' . $filename);
 		$this->addDebug('Quality: ' . ($quality ? $quality . 'p' : 'unknown'));
+		
+		// Always show debug info before download
+		echo $this->showDebugInfo();
+		echo '<div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px;">';
+		echo '<h3 style="color: #2e7d32; margin-top: 0;">Starting Download...</h3>';
+		echo '<p><strong>Quality:</strong> ' . ($quality ? $quality . 'p' : 'best available') . '</p>';
+		echo '<p><strong>URL Type:</strong> ' . (strpos($downloadUrl, '.m3u8') !== false ? 'HLS Stream (m3u8)' : 'Direct MP4') . '</p>';
+		echo '<p style="word-break: break-all;"><strong>URL:</strong> ' . htmlspecialchars(substr($downloadUrl, 0, 200)) . (strlen($downloadUrl) > 200 ? '...' : '') . '</p>';
+		echo '</div>';
 		
 		$this->changeMesg(lang(300) . '<br />Pornhub: Downloading video (' . ($quality ? $quality . 'p' : 'best quality') . ')...');
 		
