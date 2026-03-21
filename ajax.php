@@ -28,6 +28,7 @@ switch ($_GET['ajax']) {
 		$chunkGroups = array(); // Group chunk files by base name
 		$metaFiles = array(); // Store metadata files for chunk downloads
 		$fileMetaFiles = array(); // Store metadata files for single-stream downloads
+		$staleMetaAge = 3600; // Auto-cleanup .meta files older than 1 hour with no active chunks
 		
 		// Load completed files list to exclude them from pending
 		$completedFiles = array();
@@ -155,6 +156,29 @@ switch ($_GET['ajax']) {
 				}
 			}
 			closedir($dir);
+		}
+		
+		// Auto-cleanup orphaned .meta files (no matching chunk files, older than 1 hour)
+		$now = time();
+		foreach ($metaFiles as $hash => $meta) {
+			if (!isset($chunkGroups[$hash])) {
+				// No chunk files exist for this meta — check if the final file is completed
+				$metaPath = $download_dir . '.chunk_' . $hash . '.meta';
+				$metaAge = $now - @filemtime($metaPath);
+				if ($metaAge > $staleMetaAge) {
+					@unlink($metaPath);
+					unset($metaFiles[$hash]);
+				}
+			}
+		}
+		// Cleanup per-file .meta where file is already in files.lst or meta is stale
+		foreach ($fileMetaFiles as $origFile => $meta) {
+			$metaPath = $download_dir . '.' . $origFile . '.meta';
+			$metaAge = $now - @filemtime($metaPath);
+			if (isset($completedFiles[$origFile]) || $metaAge > $staleMetaAge) {
+				@unlink($metaPath);
+				unset($fileMetaFiles[$origFile]);
+			}
 		}
 		
 		// Add parallel chunk downloads as single entries
