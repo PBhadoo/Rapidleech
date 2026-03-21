@@ -168,12 +168,13 @@ class pornhub_com extends DownloadClass {
 		// Method 4: Extract mp4 URLs from HLS m3u8 streams (NEW - for server environments)
 		if (empty($downloadUrl)) {
 			$this->addDebug('Method 4: Looking for HLS m3u8 streams with embedded mp4 URLs...');
-			// Pattern: "videoUrl":"https://hv-h.phncdn.com/hls/.../1080P_4000K_xxx.mp4/master.m3u8?..."
-			if (preg_match_all('@"videoUrl"\s*:\s*"(https?://[^"]+/(\d+)P_[^/]+\.mp4)/master\.m3u8[^"]*"@', $page, $matches, PREG_SET_ORDER)) {
+			// Pattern: "videoUrl":"https:\/\/kv-h.phncdn.com\/hls\/.../1080P_4000K_xxx.mp4\/master.m3u8?..."
+			// Handle both escaped (\/) and unescaped (/) slashes
+			if (preg_match_all('@"videoUrl"\s*:\s*"(https?:[^"]+?/(\d+)P_[^/]+?\.mp4)/master\.m3u8[^"]*"@', $page, $matches, PREG_SET_ORDER)) {
 				$this->addDebug('Found ' . count($matches) . ' HLS streams with mp4 paths');
 				$bestQuality = 0;
 				foreach ($matches as $match) {
-					$url = stripcslashes($match[1]); // Extract just the mp4 URL without /master.m3u8
+					$url = stripcslashes($match[1]); // Extract just the mp4 URL without /master.m3u8 and unescape
 					$q = intval($match[2]); // Quality from URL
 					$this->addDebug('  - Quality ' . $q . 'p: ' . $url);
 					if ($q > $bestQuality) {
