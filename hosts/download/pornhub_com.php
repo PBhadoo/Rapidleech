@@ -8,7 +8,10 @@ if (!defined('RAPIDLEECH')) {
 /**
  * Pornhub Video Download Plugin
  * Supports: pornhub.com, pornhub.org, pornhubpremium.com
- * Updated: 2026-03-21 - Fixed for new HLS/get_media API
+ * Updated: 2026-03-21 - Fixed for get_media API (IP-bound URLs)
+ * 
+ * Note: Download URLs are bound to the server's IP address.
+ * The plugin must fetch the video page and get_media from the same server.
  */
 class pornhub_com extends DownloadClass {
 	public function Download($link) {
@@ -52,58 +55,18 @@ class pornhub_com extends DownloadClass {
 		$downloadUrl = '';
 		$quality = '';
 		
-		// Method 1: Use HLS URLs and convert to direct MP4
-		// HLS URLs look like: https://kv-h.phncdn.com/hls/.../720P_4000K_xxx.mp4/master.m3u8?hdnea=...
-		// Remove /master.m3u8 to get direct MP4 URL
-		if (preg_match_all('@"format"\s*:\s*"hls"[^}]*"videoUrl"\s*:\s*"([^"]+)"[^}]*"quality"\s*:\s*"(\d+)"@', $page, $hlsMatches, PREG_SET_ORDER)) {
-			$bestQuality = 0;
-			foreach ($hlsMatches as $match) {
-				$hlsUrl = stripcslashes($match[1]);
-				$q = intval($match[2]);
-				
-				// Convert HLS URL to direct MP4 URL
-				// Pattern: xxx.mp4/master.m3u8?params -> xxx.mp4?params
-				if (preg_match('@^(https?://[^?]+\.mp4)/master\.m3u8(\?.*)?$@', $hlsUrl, $mp4Match)) {
-					$mp4Url = $mp4Match[1] . ($mp4Match[2] ?? '');
-					if ($q >= $bestQuality) {
-						$bestQuality = $q;
-						$downloadUrl = $mp4Url;
-						$quality = $match[2];
-					}
-				}
+		// Method 1 (PRIORITY): Use get_media API - URLs are bound to THIS server's IP
+		// This is the most reliable method when running on a server
+		if (preg_match('@"videoUrl"\s*:\s*"(https?:[^"]*get_media[^"]*)"@', $page, $gm)) {
+			$getMediaUrl = stripcslashes($gm[1]);
+			$result = $this->resolveGetMediaUrl($getMediaUrl, $domain, $videoUrl);
+			if (!empty($result['url'])) {
+				$downloadUrl = $result['url'];
+				$quality = $result['quality'];
 			}
 		}
 		
-		// Method 2: Alternative HLS pattern
-		if (empty($downloadUrl)) {
-			if (preg_match_all('@"videoUrl"\s*:\s*"(https?://[^"]+\.mp4/master\.m3u8[^"]*)"[^}]*"quality"\s*:\s*"?(\d+)"?@', $page, $hlsMatches, PREG_SET_ORDER)) {
-				$bestQuality = 0;
-				foreach ($hlsMatches as $match) {
-					$hlsUrl = stripcslashes($match[1]);
-					$q = intval($match[2]);
-					
-					// Convert HLS to direct MP4
-					if (preg_match('@^(https?://[^?]+\.mp4)/master\.m3u8(\?.*)?$@', $hlsUrl, $mp4Match)) {
-						$mp4Url = $mp4Match[1] . ($mp4Match[2] ?? '');
-						if ($q >= $bestQuality) {
-							$bestQuality = $q;
-							$downloadUrl = $mp4Url;
-							$quality = $match[2];
-						}
-					}
-				}
-			}
-		}
-		
-		// Method 3: Try get_media URL (may not work on different IP)
-		if (empty($downloadUrl)) {
-			if (preg_match('@"videoUrl"\s*:\s*"(https?:[^"]*get_media[^"]*)"@', $page, $gm)) {
-				$getMediaUrl = stripcslashes($gm[1]);
-				$downloadUrl = $this->resolveGetMediaUrl($getMediaUrl, $domain, $videoUrl);
-			}
-		}
-		
-		// Method 4: Look for direct mp4 URLs in the page (older format)
+		// Method 2: Look for direct mp4 URLs in the page (older format)
 		if (empty($downloadUrl)) {
 			$qualities = array('1080', '720', '480', '360', '240');
 			foreach ($qualities as $q) {
@@ -115,6 +78,22 @@ class pornhub_com extends DownloadClass {
 						$downloadUrl = $url;
 						$quality = $q;
 						break;
+					}
+				}
+			}
+		}
+		
+		// Method 3: Try direct mp4 URLs from mediaDefinitions (non-HLS, non-remote)
+		if (empty($downloadUrl)) {
+			if (preg_match_all('@"format"\s*:\s*"mp4"[^}]*"videoUrl"\s*:\s*"(https?://ev\.phncdn\.com[^"]+)"[^}]*"quality"\s*:\s*"(\d+)"@', $page, $matches, PREG_SET_ORDER)) {
+				$bestQuality = 0;
+				foreach ($matches as $match) {
+					$url = stripcslashes($match[1]);
+					$q = intval($match[2]);
+					if ($q > $bestQuality) {
+						$bestQuality = $q;
+						$downloadUrl = $url;
+						$quality = $match[2];
 					}
 				}
 			}
@@ -162,65 +141,64 @@ class pornhub_com extends DownloadClass {
 	/**
 	 * Resolve get_media URL to actual MP4 download URLs
 	 * The get_media endpoint returns JSON with multiple quality options
+	 * URLs are bound to the requesting server's IP address
 	 */
 	private function resolveGetMediaUrl($getMediaUrl, $domain, $referer) {
 		$this->changeMesg(lang(300) . '<br />Pornhub: Resolving video qualities...');
 		
-		// Make request to get_media endpoint using cURL for cleaner response
+		// Make request to get_media endpoint
 		$mediaPage = $this->GetPage($getMediaUrl, 'accessAgeDisclaimerPH=1', 0, $referer, 0, 0, 0, 0,
 			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 		);
 		
-		// Remove HTTP headers - find the JSON array start
-		// Headers end with double CRLF, then body starts
+		// Extract just the JSON body - remove HTTP headers
+		$jsonBody = $mediaPage;
+		
+		// Remove HTTP headers if present
 		if (($pos = strpos($mediaPage, "\r\n\r\n")) !== false) {
-			$mediaPage = substr($mediaPage, $pos + 4);
+			$jsonBody = substr($mediaPage, $pos + 4);
+		} elseif (($pos = strpos($mediaPage, "\n\n")) !== false) {
+			$jsonBody = substr($mediaPage, $pos + 2);
 		}
-		// Also try just \n\n
-		if (($pos = strpos($mediaPage, "\n\n")) !== false && strpos($mediaPage, '[') > $pos) {
-			$mediaPage = substr($mediaPage, $pos + 2);
-		}
-		// Find the JSON array
-		if (($jsonStart = strpos($mediaPage, '[{')) !== false) {
-			$mediaPage = substr($mediaPage, $jsonStart);
-			// Find matching end
-			if (($jsonEnd = strrpos($mediaPage, '}]')) !== false) {
-				$mediaPage = substr($mediaPage, 0, $jsonEnd + 2);
-			}
+		
+		// Trim and find JSON array
+		$jsonBody = trim($jsonBody);
+		if (($jsonStart = strpos($jsonBody, '[')) !== false) {
+			$jsonBody = substr($jsonBody, $jsonStart);
 		}
 		
 		$downloadUrl = '';
 		$bestQuality = 0;
 		
-		// The response is JSON array with objects containing videoUrl and quality
-		// Try to parse as JSON
-		$mediaData = @json_decode($mediaPage, true);
+		// Parse JSON response
+		$mediaData = @json_decode($jsonBody, true);
 		
-		if (is_array($mediaData)) {
+		if (is_array($mediaData) && !empty($mediaData)) {
 			foreach ($mediaData as $item) {
-				if (!isset($item['videoUrl']) || !isset($item['format'])) continue;
+				if (!is_array($item)) continue;
+				if (!isset($item['videoUrl'])) continue;
 				
 				// Only use mp4 format, skip HLS
-				if ($item['format'] !== 'mp4') continue;
+				if (isset($item['format']) && $item['format'] !== 'mp4') continue;
 				
 				$url = $item['videoUrl'];
 				
-				// Skip if it's an image URL or HLS
-				if (strpos($url, '/plain/') !== false || strpos($url, '.m3u8') !== false) {
-					continue;
-				}
+				// Skip image URLs, HLS streams
+				if (strpos($url, '/plain/') !== false) continue;
+				if (strpos($url, '.m3u8') !== false) continue;
+				if (preg_match('@\.(jpg|jpeg|png|gif|webp)@i', $url)) continue;
 				
 				// Get quality
 				$q = 0;
 				if (isset($item['quality']) && is_numeric($item['quality'])) {
 					$q = intval($item['quality']);
-				} elseif (isset($item['height'])) {
+				} elseif (isset($item['height']) && is_numeric($item['height'])) {
 					$q = intval($item['height']);
 				} elseif (preg_match('@/(\d{3,4})P_@i', $url, $qm)) {
 					$q = intval($qm[1]);
 				}
 				
-				// Prefer higher quality
+				// Prefer higher quality, must be .mp4
 				if ($q >= $bestQuality && strpos($url, '.mp4') !== false) {
 					$bestQuality = $q;
 					$downloadUrl = $url;
@@ -228,14 +206,12 @@ class pornhub_com extends DownloadClass {
 			}
 		}
 		
-		// Fallback: Parse with regex if JSON parsing failed
-		if (empty($downloadUrl)) {
+		// Fallback: Parse with regex if JSON failed
+		if (empty($downloadUrl) && !empty($jsonBody)) {
 			// Pattern: "videoUrl":"https://ev.phncdn.com/.../1080P_4000K_xxx.mp4?..."
-			if (preg_match_all('@"videoUrl"\s*:\s*"(https?://[^"]+\.mp4[^"]*)"@', $mediaPage, $urlMatches)) {
+			if (preg_match_all('@"videoUrl"\s*:\s*"(https?://ev\.phncdn\.com/[^"]+\.mp4[^"]*)"@', $jsonBody, $urlMatches)) {
 				foreach ($urlMatches[1] as $url) {
 					$url = stripcslashes($url);
-					// Skip image URLs
-					if (strpos($url, '/plain/') !== false) continue;
 					
 					// Extract quality from URL
 					if (preg_match('@/(\d{3,4})P_@i', $url, $qm)) {
@@ -245,16 +221,19 @@ class pornhub_com extends DownloadClass {
 							$downloadUrl = $url;
 						}
 					} elseif (empty($downloadUrl)) {
-						// Use first valid URL as fallback
 						$downloadUrl = $url;
 					}
 				}
 			}
 		}
 		
-		return $downloadUrl;
+		return array(
+			'url' => $downloadUrl,
+			'quality' => $bestQuality > 0 ? strval($bestQuality) : ''
+		);
 	}
 }
 
-// Updated for Rapidleech - Fixed for new HLS/get_media API (March 2026)
+// Updated for Rapidleech - Fixed for get_media API (March 2026)
+// Note: Download URLs are IP-bound. The download server must fetch URLs directly.
 ?>
