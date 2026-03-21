@@ -48,17 +48,24 @@ class d1024tera_com extends DownloadClass {
 		}
 
 		// Extract jsToken from page - try multiple patterns
+		// Pattern 1: Direct jsToken assignment
 		if (preg_match('/jsToken\s*(?:=|:)\s*"([^"]+)"/', $body, $jm)) {
 			$this->jsToken = $jm[1];
 		} elseif (preg_match("/jsToken\s*(?:=|:)\s*'([^']+)'/", $body, $jm)) {
 			$this->jsToken = $jm[1];
-		} elseif (preg_match('/fn\(\s*"([0-9A-F]{64,})"\s*\)/', $body, $jm)) {
+		}
+		// Pattern 2: Obfuscated with decodeURIComponent - extract encoded hex string
+		elseif (preg_match('/decodeURIComponent\([^)]*%22([0-9A-F]{64,})%22[^)]*\)/', $body, $jm)) {
 			$this->jsToken = $jm[1];
-		} elseif (preg_match('/dp-logid["\']?\s*:\s*["\']([^"\']+)["\']/', $body, $jm)) {
-			// Try dp-logid as jsToken alternative
+		}
+		// Pattern 3: Direct fn() call with hex token
+		elseif (preg_match('/fn\(\s*["\']([0-9A-F]{64,})["\']\s*\)/', $body, $jm)) {
+			$this->jsToken = $jm[1];
+		}
+		// Pattern 4: Alternative token sources
+		elseif (preg_match('/dp-logid["\']?\s*:\s*["\']([^"\']+)["\']/', $body, $jm)) {
 			$this->jsToken = $jm[1];
 		} elseif (preg_match('/logid["\']?\s*:\s*["\']([^"\']+)["\']/', $body, $jm)) {
-			// Try logid as jsToken alternative
 			$this->jsToken = $jm[1];
 		} else {
 			html_error('Could not extract jsToken from TeraBox page. The page may have changed or requires login.');
