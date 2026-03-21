@@ -134,13 +134,7 @@ class transfer_it extends DownloadClass {
 		}
 
 		if (empty($fileNodes)) {
-			// Debug: show what the API returned
-			$dbg = '<br><b>Debug Info:</b><br>';
-			$dbg .= 'Total nodes: ' . count($nodes) . '<br>';
-			foreach ($nodes as $i => $node) {
-				$dbg .= "Node $i: t={$node['t']}, h={$node['h']}, k=" . (isset($node['k']) ? htmlspecialchars(substr($node['k'], 0, 80)) : 'N/A') . '<br>';
-			}
-			html_error('No downloadable files found in this transfer.' . $dbg);
+			html_error('No downloadable files found in this transfer.');
 		}
 
 		// Step 4: Download

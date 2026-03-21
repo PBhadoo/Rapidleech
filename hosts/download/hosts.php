@@ -38,6 +38,9 @@ while (false !== ($entry = $d->read())) {
 			case 'youtube.com':
 				$host['youtu.be'] = $host['youtube.com'];
 				break;
+			case '1024tera.com':
+				foreach(array('terabox.com', 'teraboxapp.com', '4funbox.com', 'mirrobox.com', 'teraboxlink.com') as $tbdomain) $host["$tbdomain"] = $host['1024tera.com'];
+				break;
 			case 'xvideos.com':
 				$host['xnxx.com'] = $host['xvideos.com'];
 				break;
