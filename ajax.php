@@ -158,14 +158,24 @@ switch ($_GET['ajax']) {
 			closedir($dir);
 		}
 		
-		// Auto-cleanup orphaned .meta files (no matching chunk files, older than 1 hour)
+		// Auto-cleanup orphaned .meta files AND show merging-only entries
 		$now = time();
 		foreach ($metaFiles as $hash => $meta) {
 			if (!isset($chunkGroups[$hash])) {
-				// No chunk files exist for this meta — check if the final file is completed
 				$metaPath = $download_dir . '.chunk_' . $hash . '.meta';
 				$metaAge = $now - @filemtime($metaPath);
-				if ($metaAge > $staleMetaAge) {
+				
+				// If meta says "merging" and is recent, show it as merging in pending
+				if (!empty($meta['status']) && $meta['status'] === 'merging' && $metaAge < 600) {
+					$pending[] = array(
+						'filename' => !empty($meta['filename']) ? $meta['filename'] : 'Unknown',
+						'size' => bytesToKbOrMbOrGb(!empty($meta['filesize']) ? $meta['filesize'] : 0),
+						'modified' => date('H:i:s', @filemtime($metaPath)),
+						'status' => 'Merging Parts...',
+						'progress' => 100,
+						'age' => $metaAge
+					);
+				} elseif ($metaAge > $staleMetaAge) {
 					@unlink($metaPath);
 					unset($metaFiles[$hash]);
 				}
@@ -201,11 +211,18 @@ switch ($_GET['ajax']) {
 			
 			$progressPercent = ($totalSize > 0) ? round(($group['total_size'] / $totalSize) * 100, 1) : 0;
 			
+			// Check if meta indicates merging status
+			$dlStatus = 'Downloading... ' . $progressPercent . '%';
+			if (isset($metaFiles[$hash]) && !empty($metaFiles[$hash]['status']) && $metaFiles[$hash]['status'] === 'merging') {
+				$dlStatus = 'Merging Parts...';
+				$progressPercent = 100;
+			}
+			
 			$pending[] = array(
 				'filename' => $filename,
 				'size' => bytesToKbOrMbOrGb($group['total_size']) . ' / ' . bytesToKbOrMbOrGb($totalSize),
 				'modified' => date('H:i:s', $group['latest_mtime']),
-				'status' => 'Downloading... ' . $progressPercent . '%',
+				'status' => $dlStatus,
 				'progress' => $progressPercent,
 				'age' => $group['age']
 			);
