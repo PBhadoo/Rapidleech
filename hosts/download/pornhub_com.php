@@ -36,8 +36,8 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('=== PORNHUB DOWNLOAD DEBUG ===');
 		$this->addDebug('Input URL: ' . $link);
 		
-		// Check if quality is being selected
-		$selectedQuality = isset($_GET['ph_quality']) ? intval($_GET['ph_quality']) : 0;
+		// Check if quality is being selected (can come from GET or POST)
+		$selectedQuality = isset($_POST['ph_quality']) ? intval($_POST['ph_quality']) : (isset($_GET['ph_quality']) ? intval($_GET['ph_quality']) : 0);
 		$this->addDebug('Selected quality from request: ' . ($selectedQuality > 0 ? $selectedQuality . 'p' : 'auto (best)'));
 		
 		// Extract viewkey from URL
@@ -188,9 +188,8 @@ class pornhub_com extends DownloadClass {
 				
 				// If no quality selected, show quality selector
 				if ($selectedQuality == 0 && count($availableQualities) > 1) {
-					// Build RapidLeech download URL (not the original pornhub URL)
-					$currentUrl = $_SERVER['REQUEST_URI'];
-					$this->showQualitySelector($currentUrl, $title, $availableQualities);
+					// Pass the original video link to quality selector
+					$this->showQualitySelector($link, $viewkey, $title, $availableQualities);
 					exit;
 				}
 				
@@ -686,19 +685,29 @@ class pornhub_com extends DownloadClass {
 	}
 	
 	/**
-	 * Show quality selector UI
+	 * Show quality selector UI - uses forms to preserve POST data
 	 */
-	private function showQualitySelector($currentUrl, $title, $availableQualities) {
+	private function showQualitySelector($originalLink, $viewkey, $title, $availableQualities) {
 		echo '<div style="max-width: 800px; margin: 50px auto; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); color: #000;">';
 		echo '<h2 style="color: #333; margin-top: 0;">📹 Select Video Quality</h2>';
 		echo '<h3 style="color: #666; font-weight: normal; margin-bottom: 30px;">' . htmlspecialchars($title) . '</h3>';
 		
+		echo '<form method="POST" action="" id="qualityForm">';
+		// Preserve all original POST/GET parameters
+		foreach ($_POST as $key => $value) {
+			if ($key !== 'ph_quality') {
+				echo '<input type="hidden" name="' . htmlspecialchars($key) . '" value="' . htmlspecialchars($value) . '">';
+			}
+		}
+		foreach ($_GET as $key => $value) {
+			if ($key !== 'ph_quality') {
+				echo '<input type="hidden" name="' . htmlspecialchars($key) . '" value="' . htmlspecialchars($value) . '">';
+			}
+		}
+		
 		echo '<div style="margin-bottom: 30px;">';
 		krsort($availableQualities); // Sort descending (1080p first)
 		foreach ($availableQualities as $q => $url) {
-			// Add quality parameter to current RapidLeech URL
-			$separator = (strpos($currentUrl, '?') !== false) ? '&' : '?';
-			$downloadUrl = $currentUrl . $separator . 'ph_quality=' . $q;
 			$sizeEstimate = '';
 			switch($q) {
 				case 1080: $sizeEstimate = '~200-400 MB'; break;
@@ -712,15 +721,16 @@ class pornhub_com extends DownloadClass {
 			$borderColor = $q >= 720 ? '#4caf50' : '#ff9800';
 			$badge = $q == 1080 ? '<span style="background: #f44336; color: #fff; padding: 2px 8px; border-radius: 3px; font-size: 11px; margin-left: 10px;">BEST</span>' : '';
 			
-			echo '<a href="' . htmlspecialchars($downloadUrl) . '" style="display: block; padding: 20px; margin-bottom: 15px; background: ' . $bgColor . '; border: 2px solid ' . $borderColor . '; border-radius: 6px; text-decoration: none; color: #000; transition: all 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">';
+			echo '<button type="submit" name="ph_quality" value="' . $q . '" style="width: 100%; padding: 20px; margin-bottom: 15px; background: ' . $bgColor . '; border: 2px solid ' . $borderColor . '; border-radius: 6px; cursor: pointer; color: #000; transition: all 0.2s; text-align: left; font-size: 16px;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">';
 			echo '<div style="font-size: 24px; font-weight: bold; color: ' . $borderColor . ';">' . $q . 'p' . $badge . '</div>';
 			echo '<div style="margin-top: 5px; color: #666;">Resolution: ' . $this->getResolution($q) . '</div>';
 			if ($sizeEstimate) {
 				echo '<div style="margin-top: 5px; color: #999; font-size: 14px;">Estimated size: ' . $sizeEstimate . '</div>';
 			}
-			echo '</a>';
+			echo '</button>';
 		}
 		echo '</div>';
+		echo '</form>';
 		
 		echo '<div style="padding: 15px; background: #f5f5f5; border-radius: 4px; color: #666; font-size: 14px;">';
 		echo '<strong>💡 Tip:</strong> Higher quality = better video but larger file size and longer download time.';
