@@ -151,14 +151,27 @@ class pornhub_com extends DownloadClass {
 	private function resolveGetMediaUrl($getMediaUrl, $domain, $referer) {
 		$this->changeMesg(lang(300) . '<br />Pornhub: Resolving video qualities...');
 		
-		// Make request to get_media endpoint
+		// Make request to get_media endpoint using cURL for cleaner response
 		$mediaPage = $this->GetPage($getMediaUrl, 'accessAgeDisclaimerPH=1', 0, $referer, 0, 0, 0, 0,
 			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 		);
 		
-		// Remove HTTP headers if present
-		if (strpos($mediaPage, "\r\n\r\n") !== false) {
-			$mediaPage = substr($mediaPage, strpos($mediaPage, "\r\n\r\n") + 4);
+		// Remove HTTP headers - find the JSON array start
+		// Headers end with double CRLF, then body starts
+		if (($pos = strpos($mediaPage, "\r\n\r\n")) !== false) {
+			$mediaPage = substr($mediaPage, $pos + 4);
+		}
+		// Also try just \n\n
+		if (($pos = strpos($mediaPage, "\n\n")) !== false && strpos($mediaPage, '[') > $pos) {
+			$mediaPage = substr($mediaPage, $pos + 2);
+		}
+		// Find the JSON array
+		if (($jsonStart = strpos($mediaPage, '[{')) !== false) {
+			$mediaPage = substr($mediaPage, $jsonStart);
+			// Find matching end
+			if (($jsonEnd = strrpos($mediaPage, '}]')) !== false) {
+				$mediaPage = substr($mediaPage, 0, $jsonEnd + 2);
+			}
 		}
 		
 		$downloadUrl = '';
