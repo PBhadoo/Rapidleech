@@ -199,9 +199,19 @@ class pornhub_com extends DownloadClass {
 					$this->addDebug('m3u8 response length: ' . strlen($m3u8Content) . ' bytes');
 					$this->addDebug('m3u8 content (first 500 chars): ' . substr($m3u8Content, 0, 500));
 					
+					// Strip HTTP headers from m3u8 content
+					$m3u8Body = $m3u8Content;
+					if (($pos = strpos($m3u8Content, "\r\n\r\n")) !== false) {
+						$m3u8Body = substr($m3u8Content, $pos + 4);
+					} elseif (($pos = strpos($m3u8Content, "\n\n")) !== false) {
+						$m3u8Body = substr($m3u8Content, $pos + 2);
+					}
+					$m3u8Body = trim($m3u8Body);
+					$this->addDebug('m3u8 body (after header strip): ' . $m3u8Body);
+					
 					// Parse m3u8 to find the actual mp4 URL or segments
 					// Look for the highest bitrate variant
-					if (preg_match('@#EXT-X-STREAM-INF:[^\n]*\n([^\n]+\.m3u8)@', $m3u8Content, $variantMatch)) {
+					if (preg_match('@#EXT-X-STREAM-INF:[^\n]*\n([^\n]+\.m3u8)@', $m3u8Body, $variantMatch)) {
 						$variantUrl = $variantMatch[1];
 						// If relative URL, make it absolute
 						if (strpos($variantUrl, 'http') !== 0) {
@@ -225,25 +235,13 @@ class pornhub_com extends DownloadClass {
 							$variantContent = substr($variantContent, $pos + 2);
 						}
 						$variantContent = trim($variantContent);
-						$this->addDebug('Variant playlist content (first 500 chars): ' . substr($variantContent, 0, 500));
+						$this->addDebug('Variant playlist full content: ' . $variantContent);
 						
-						// Extract .ts segments or direct mp4 URL
-						if (preg_match('@#EXTINF:[^\n]*\n([^\n]+\.(ts|mp4))@', $variantContent, $segmentMatch)) {
-							$segmentUrl = $segmentMatch[1];
-							// If relative URL, make it absolute
-							if (strpos($segmentUrl, 'http') !== 0) {
-								$baseUrl = preg_replace('@/[^/]*$@', '/', $variantUrl);
-								$segmentUrl = $baseUrl . $segmentUrl;
-							}
-							
-							// If it's a direct mp4, use it
-							if (strpos($segmentUrl, '.mp4') !== false) {
-								$downloadUrl = $segmentUrl;
-								$this->addDebug('Method 4 SUCCESS: Found direct mp4 URL in variant playlist');
-							} else {
-								$this->addDebug('Method 4: HLS uses segments (.ts files), not supported for direct download');
-							}
-						}
+						// Use the variant m3u8 URL itself as the download URL
+						// Download managers like IDM can handle HLS m3u8 playlists automatically
+						$downloadUrl = $variantUrl;
+						$this->addDebug('Method 4 SUCCESS: Using variant m3u8 URL for HLS download: ' . $variantUrl);
+						$this->addDebug('Note: This is an HLS stream. The downloader will fetch and merge segments automatically.');
 					} else {
 						$this->addDebug('Method 4: HLS video uses segmented streaming (.ts files)');
 						$this->addDebug('NOTE: Segmented HLS videos cannot be downloaded directly.');
