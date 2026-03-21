@@ -190,8 +190,12 @@ class pornhub_com extends DownloadClass {
 				if (!empty($bestM3u8Url)) {
 					$this->addDebug('Fetching m3u8 playlist for ' . $quality . 'p...');
 					
-					// Fetch the m3u8 playlist
-					$m3u8Content = $this->GetPage($bestM3u8Url, 0, 0, $videoUrl);
+					// Fetch the m3u8 playlist - NO Origin header, CDN will reject it
+					$m3u8Content = $this->GetPage($bestM3u8Url, 0, 0, $videoUrl, 0, 0, 0, 0,
+						'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+						'Accept: */*',
+						'Accept-Language: en-US,en;q=0.9'
+					);
 					$this->addDebug('m3u8 response length: ' . strlen($m3u8Content) . ' bytes');
 					$this->addDebug('m3u8 content (first 500 chars): ' . substr($m3u8Content, 0, 500));
 					
@@ -206,8 +210,12 @@ class pornhub_com extends DownloadClass {
 						}
 						$this->addDebug('Found variant playlist: ' . $variantUrl);
 						
-						// Fetch the variant playlist
-						$variantContent = $this->GetPage($variantUrl, 0, 0, $videoUrl);
+						// Fetch the variant playlist - NO Origin header
+						$variantContent = $this->GetPage($variantUrl, 0, 0, $bestM3u8Url, 0, 0, 0, 0,
+							'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+							'Accept: */*',
+							'Accept-Language: en-US,en;q=0.9'
+						);
 						$this->addDebug('Variant playlist length: ' . strlen($variantContent) . ' bytes');
 						
 						// Strip HTTP headers from variant playlist
