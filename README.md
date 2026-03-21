@@ -66,6 +66,17 @@ Switch templates in `configs/config.php`:
 'template_used' => 'plugmod',  // Classic UI
 ```
 
+#### Actively Tested & Fixed Plugins (2026)
+
+The following plugins have been recently tested and confirmed working:
+
+✅ **Pornhub** — Full HLS stream support with quality selector (1080p/720p/480p/360p/240p)  
+✅ **Mega.nz** — Premium account support, download queue management  
+✅ **Transfer.it** — Direct file downloads  
+✅ **MediaFire** — Direct downloads without captcha
+
+*Note: Other plugins may work but haven't been actively tested. Report issues via pull requests.*
+
 #### Update Existing Installation
 
 ```bash
