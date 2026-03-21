@@ -47,18 +47,21 @@ class d1024tera_com extends DownloadClass {
 			$this->cookie = implode('; ', array_values($cookies));
 		}
 
-		// Extract jsToken from page
+		// Extract jsToken from page - try multiple patterns
 		if (preg_match('/jsToken\s*(?:=|:)\s*"([^"]+)"/', $body, $jm)) {
 			$this->jsToken = $jm[1];
 		} elseif (preg_match("/jsToken\s*(?:=|:)\s*'([^']+)'/", $body, $jm)) {
 			$this->jsToken = $jm[1];
+		} elseif (preg_match('/fn\(\s*"([0-9A-F]{64,})"\s*\)/', $body, $jm)) {
+			$this->jsToken = $jm[1];
+		} elseif (preg_match('/dp-logid["\']?\s*:\s*["\']([^"\']+)["\']/', $body, $jm)) {
+			// Try dp-logid as jsToken alternative
+			$this->jsToken = $jm[1];
+		} elseif (preg_match('/logid["\']?\s*:\s*["\']([^"\']+)["\']/', $body, $jm)) {
+			// Try logid as jsToken alternative
+			$this->jsToken = $jm[1];
 		} else {
-			// Try alternative pattern
-			if (preg_match('/fn\(\s*"([0-9A-F]{64,})"\s*\)/', $body, $jm)) {
-				$this->jsToken = $jm[1];
-			} else {
-				html_error('Could not extract jsToken from TeraBox page. The page may have changed.');
-			}
+			html_error('Could not extract jsToken from TeraBox page. The page may have changed or requires login.');
 		}
 
 		// Step 2: Get file info via shorturlinfo API
@@ -66,7 +69,7 @@ class d1024tera_com extends DownloadClass {
 		$infoUrl = "https://{$baseDomain}/api/shorturlinfo?"
 			. "app_id={$this->appId}&web=1&channel=dubox&clienttype=0"
 			. "&jsToken=" . urlencode($this->jsToken)
-			. "&shorturl=1{$surl}&root=1&scene=";
+			. "&shorturl=1{$surl}&root=1";
 
 		$infoPage = $this->GetPage($infoUrl, $this->cookie, 0, $shareUrl);
 		list($infoHeader, $infoBody) = array_map('trim', explode("\r\n\r\n", $infoPage, 2));
@@ -121,14 +124,14 @@ class d1024tera_com extends DownloadClass {
 		// Try to get download link
 		$this->changeMesg(lang(300) . '<br />TeraBox: Getting download link for ' . htmlspecialchars($fname) . '...');
 
-		// Method 1: Try dlinkext API 
-		$dlUrl = "https://{$baseDomain}/share/extdownload?"
+		// Method 1: Try dlinkext API (for newer 1024tera/terabox)
+		$dlUrl = "https://{$baseDomain}/api/download?"
 			. "app_id={$this->appId}&web=1&channel=dubox&clienttype=0"
 			. "&jsToken=" . urlencode($this->jsToken)
 			. "&sign={$sign}&timestamp={$timestamp}"
 			. "&shareid={$shareid}&uk={$uk}"
 			. "&fid_list=[{$fsId}]"
-			. "&primaryid={$shareid}&product=share&nozip=1";
+			. "&primaryid={$shareid}&product=share";
 
 		$dlPage = $this->GetPage($dlUrl, $this->cookie, 0, $shareUrl);
 		list($dlHeader, $dlBody) = array_map('trim', explode("\r\n\r\n", $dlPage, 2));
@@ -144,7 +147,7 @@ class d1024tera_com extends DownloadClass {
 			}
 		}
 
-		// Method 2: Try sharedownload API
+		// Method 2: Try legacy sharedownload API
 		if (empty($dlink)) {
 			$dlUrl2 = "https://{$baseDomain}/api/sharedownload?"
 				. "app_id={$this->appId}&web=1&channel=dubox&clienttype=0"
@@ -167,7 +170,31 @@ class d1024tera_com extends DownloadClass {
 			}
 		}
 
-		// Method 3: If we have dlink from shorturlinfo
+		// Method 3: Try extdownload API (alternative endpoint)
+		if (empty($dlink)) {
+			$dlUrl3 = "https://{$baseDomain}/share/extdownload?"
+				. "app_id={$this->appId}&web=1&channel=dubox&clienttype=0"
+				. "&jsToken=" . urlencode($this->jsToken)
+				. "&sign={$sign}&timestamp={$timestamp}"
+				. "&shareid={$shareid}&uk={$uk}"
+				. "&fid_list=[{$fsId}]"
+				. "&primaryid={$shareid}&product=share&nozip=1";
+
+			$dlPage3 = $this->GetPage($dlUrl3, $this->cookie, 0, $shareUrl);
+			list($dlHeader3, $dlBody3) = array_map('trim', explode("\r\n\r\n", $dlPage3, 2));
+			$dlInfo3 = @json_decode($dlBody3, true);
+
+			if ($dlInfo3 && isset($dlInfo3['errno']) && $dlInfo3['errno'] == 0 && !empty($dlInfo3['list'])) {
+				foreach ($dlInfo3['list'] as $item) {
+					if (!empty($item['dlink'])) {
+						$dlink = $item['dlink'];
+						break;
+					}
+				}
+			}
+		}
+
+		// Method 4: If we have dlink from shorturlinfo
 		if (empty($dlink) && !empty($file['dlink'])) {
 			$dlink = $file['dlink'];
 		}
@@ -192,10 +219,6 @@ class d1024tera_com extends DownloadClass {
 
 	private function extractSurl($link) {
 		// Format: /sharing/link?surl=XXX or /s/1XXX or /s/XXX
-		if (preg_match('/[?&]surl=([a-zA-Z0-9_\-]+)/', $link, $m)) {
-			return $m[1];
-		}
-		// Format with fsid: /sharing/link?surl=XXX&fsid=YYY
 		if (preg_match('/[?&]surl=([a-zA-Z0-9_\-]+)/', $link, $m)) {
 			return $m[1];
 		}
