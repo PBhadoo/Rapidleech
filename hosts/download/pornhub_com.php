@@ -565,11 +565,11 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('Total segments: ' . count($segments));
 		$this->addDebug('Output file: ' . $filename);
 		
-		// Wrap everything in centered container
-		echo '<div style="max-width: 900px; margin: 50px auto; padding: 20px;">';
+		// Wrap everything in centered container with strong centering
+		echo '<div style="max-width: 900px; margin-left: auto !important; margin-right: auto !important; margin-top: 50px; margin-bottom: 50px; padding: 20px; display: block;">';
 		
 		// Show progress (debug will be shown at bottom only)
-		echo '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; color: #000;">';
+		echo '<div style="margin: 20px auto; padding: 15px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; color: #000; text-align: left;">';
 		echo '<h3 style="color: #1976d2; margin-top: 0;">Downloading HLS Stream</h3>';
 		echo '<p><strong>Quality:</strong> ' . $quality . 'p (1080p)</p>';
 		echo '<p><strong>Segments:</strong> ' . count($segments) . ' parts</p>';
@@ -648,7 +648,7 @@ class pornhub_com extends DownloadClass {
 			// Create download URL - use relative path from web root
 			$downloadLink = 'files/' . $filename;
 			
-			echo '<div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px; color: #000;">';
+			echo '<div style="margin: 20px auto; padding: 15px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px; color: #000; text-align: left;">';
 			echo '<h3 style="color: #2e7d32; margin-top: 0;">✓ Download Complete!</h3>';
 			echo '<p><strong>Downloaded:</strong> ' . $downloadedCount . '/' . $totalSegments . ' segments</p>';
 			if ($failedCount > 0) {
@@ -664,7 +664,7 @@ class pornhub_com extends DownloadClass {
 			echo '</div>';
 			
 			// Collapsible debug section at the end
-			echo '<div style="margin: 20px 0; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">';
+			echo '<div style="margin: 20px auto; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">';
 			echo '<div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==\'none\'?\'block\':\'none\'" style="padding: 15px; background: #f5f5f5; cursor: pointer; color: #000; user-select: none;">';
 			echo '<h3 style="margin: 0; display: inline;">📋 Debug Information</h3>';
 			echo '<span style="float: right; font-weight: bold;">▼ Click to expand</span>';
@@ -687,7 +687,7 @@ class pornhub_com extends DownloadClass {
 	 * Show quality selector UI - uses forms to preserve POST data
 	 */
 	private function showQualitySelector($originalLink, $viewkey, $title, $availableQualities) {
-		echo '<div style="max-width: 800px; margin: 50px auto; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); color: #000;">';
+		echo '<div style="max-width: 800px; margin-left: auto !important; margin-right: auto !important; margin-top: 50px; margin-bottom: 50px; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); color: #000; display: block;">';
 		echo '<h2 style="color: #333; margin-top: 0;">📹 Select Video Quality</h2>';
 		echo '<h3 style="color: #666; font-weight: normal; margin-bottom: 30px;">' . htmlspecialchars($title) . '</h3>';
 		
