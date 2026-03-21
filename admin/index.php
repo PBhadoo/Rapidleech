@@ -151,10 +151,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $branchEsc = escapeshellarg($branch);
             if ($fullReset) {
                 // Full reset: overwrite everything including configs
-                $cmd = "cd $rootDir && git remote set-url origin $repoUrlEsc && git fetch origin $branchEsc && git reset --hard origin/$branchEsc && chmod -R 777 files/ configs/ 2>&1";
+                $cmd = "cd $rootDir && git remote set-url origin $repoUrlEsc && git fetch origin $branchEsc && git reset --hard origin/$branchEsc && chmod -R 777 files/ configs/ rar/ 2>&1";
             } else {
                 // Preserve configs
-                $cmd = "cd $rootDir && cp configs/accounts.php configs/accounts.php.bak && cp configs/config.php configs/config.php.bak && git remote set-url origin $repoUrlEsc && git fetch origin $branchEsc && git reset --hard origin/$branchEsc && cp configs/accounts.php.bak configs/accounts.php && cp configs/config.php.bak configs/config.php && chmod -R 777 files/ configs/ 2>&1";
+                $cmd = "cd $rootDir && cp configs/accounts.php configs/accounts.php.bak && cp configs/config.php configs/config.php.bak && git remote set-url origin $repoUrlEsc && git fetch origin $branchEsc && git reset --hard origin/$branchEsc && cp configs/accounts.php.bak configs/accounts.php && cp configs/config.php.bak configs/config.php && chmod -R 777 files/ configs/ rar/ 2>&1";
             }
             $output = shell_exec($cmd);
             $resetType = $fullReset ? 'Full reset (configs overwritten)' : 'Configs preserved';
