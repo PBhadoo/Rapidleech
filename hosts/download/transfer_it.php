@@ -244,17 +244,17 @@ class transfer_it extends DownloadClass {
 	}
 
 	private function decryptFileKey($keyStr, $folderKey) {
-		// File keys in transfer.it can be in format "handle:key" or just "key"
-		if (strpos($keyStr, ':') !== false) {
+		// File keys in transfer.it can be in format "handle:key", "handle:key/handle:key" or just "key"
+		if (strpos($keyStr, '/') !== false || strpos($keyStr, ':') !== false) {
 			$parts = explode('/', $keyStr);
-			$keyStr = '';
+			$found = '';
 			foreach ($parts as $part) {
 				if (strpos($part, ':') !== false) {
-					list(, $k) = explode(':', $part, 2);
-					$keyStr = $k;
+					list(, $found) = explode(':', $part, 2);
 					break;
 				}
 			}
+			if (!empty($found)) $keyStr = $found;
 		}
 
 		if (empty($keyStr)) return false;
