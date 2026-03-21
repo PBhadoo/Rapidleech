@@ -36,6 +36,10 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('=== PORNHUB DOWNLOAD DEBUG ===');
 		$this->addDebug('Input URL: ' . $link);
 		
+		// Check if quality is being selected
+		$selectedQuality = isset($_GET['ph_quality']) ? intval($_GET['ph_quality']) : 0;
+		$this->addDebug('Selected quality from request: ' . ($selectedQuality > 0 ? $selectedQuality . 'p' : 'auto (best)'));
+		
 		// Extract viewkey from URL
 		if (!preg_match('@[?&]viewkey=([a-zA-Z0-9]+)@i', $link, $viewkey)) {
 			$this->addDebug('ERROR: Failed to extract viewkey from URL');
@@ -172,19 +176,42 @@ class pornhub_com extends DownloadClass {
 			// Match escaped slashes in JSON: \/
 			if (preg_match_all('@"videoUrl":"(https?:\\\\/\\\\/[^"]+?\\\\/(\d+)P_[^"\\\\]+\.mp4\\\\/master\.m3u8[^"]*)"@', $page, $matches, PREG_SET_ORDER)) {
 				$this->addDebug('Found ' . count($matches) . ' HLS m3u8 streams');
+				
+				// Collect all available qualities
+				$availableQualities = array();
+				foreach ($matches as $match) {
+					$m3u8Url = stripcslashes($match[1]);
+					$q = intval($match[2]);
+					$availableQualities[$q] = $m3u8Url;
+					$this->addDebug('  - Quality ' . $q . 'p m3u8: ' . substr($m3u8Url, 0, 100) . '...');
+				}
+				
+				// If no quality selected, show quality selector
+				if ($selectedQuality == 0 && count($availableQualities) > 1) {
+					$this->showQualitySelector($link, $title, $availableQualities);
+					exit;
+				}
+				
+				// Select quality (user choice or best available)
 				$bestQuality = 0;
 				$bestM3u8Url = '';
 				
-				// Find the best quality m3u8
-				foreach ($matches as $match) {
-					$m3u8Url = stripcslashes($match[1]); // Unescape the URL
-					$q = intval($match[2]); // Quality from URL
-					$this->addDebug('  - Quality ' . $q . 'p m3u8: ' . substr($m3u8Url, 0, 100) . '...');
-					if ($q > $bestQuality) {
-						$bestQuality = $q;
-						$bestM3u8Url = $m3u8Url;
-						$quality = strval($q);
+				if ($selectedQuality > 0 && isset($availableQualities[$selectedQuality])) {
+					// Use user-selected quality
+					$bestQuality = $selectedQuality;
+					$bestM3u8Url = $availableQualities[$selectedQuality];
+					$quality = strval($bestQuality);
+					$this->addDebug('Using user-selected quality: ' . $quality . 'p');
+				} else {
+					// Find the best quality automatically
+					foreach ($availableQualities as $q => $url) {
+						if ($q > $bestQuality) {
+							$bestQuality = $q;
+							$bestM3u8Url = $url;
+							$quality = strval($q);
+						}
 					}
+					$this->addDebug('Auto-selected best quality: ' . $quality . 'p');
 				}
 				
 				if (!empty($bestM3u8Url)) {
@@ -622,6 +649,9 @@ class pornhub_com extends DownloadClass {
 			$fileSize = @filesize($outputPath);
 			$fileSizeMB = round($fileSize / (1024 * 1024), 2);
 			
+			// Create download URL
+			$downloadLink = '?GO=files&file=' . urlencode($filename);
+			
 			echo '<div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px; color: #000;">';
 			echo '<h3 style="color: #2e7d32; margin-top: 0;">✓ Download Complete!</h3>';
 			echo '<p><strong>Downloaded:</strong> ' . $downloadedCount . '/' . $totalSegments . ' segments</p>';
@@ -631,12 +661,86 @@ class pornhub_com extends DownloadClass {
 			echo '<p><strong>File Size:</strong> ' . $fileSizeMB . ' MB (' . number_format($fileSize) . ' bytes)</p>';
 			echo '<p><strong>Saved to:</strong> ' . htmlspecialchars($filename) . '</p>';
 			echo '<p><strong>Location:</strong> ' . htmlspecialchars(DOWNLOAD_DIR . $filename) . '</p>';
+			echo '<div style="margin-top: 15px;">';
+			echo '<a href="' . htmlspecialchars($downloadLink) . '" style="display: inline-block; padding: 10px 20px; margin-right: 10px; background: #4caf50; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">⬇ Download File</a>';
+			echo '<a href="' . htmlspecialchars('?GO=files') . '" style="display: inline-block; padding: 10px 20px; background: #2196f3; color: #fff; text-decoration: none; border-radius: 4px;">View All Files</a>';
 			echo '</div>';
-			echo '<div style="margin: 20px 0;"><a href="' . htmlspecialchars('?GO=files') . '" style="display: inline-block; padding: 10px 20px; background: #2196f3; color: #fff; text-decoration: none; border-radius: 4px;">View Downloaded Files</a></div>';
+			echo '</div>';
+			
+			// Collapsible debug section at the end
+			echo '<div style="margin: 20px 0; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">';
+			echo '<div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==\'none\'?\'block\':\'none\'" style="padding: 15px; background: #f5f5f5; cursor: pointer; color: #000; user-select: none;">';
+			echo '<h3 style="margin: 0; display: inline;">📋 Debug Information</h3>';
+			echo '<span style="float: right; font-weight: bold;">▼ Click to expand</span>';
+			echo '</div>';
+			echo '<div style="display: none; padding: 15px; background: #fff;">';
+			echo $this->showDebugInfo();
+			echo '</div>';
+			echo '</div>';
 		} else {
 			@unlink($tempFile);
 			html_error('Failed to download any video segments. All requests failed.');
 		}
+	}
+	
+	/**
+	 * Show quality selector UI
+	 */
+	private function showQualitySelector($originalUrl, $title, $availableQualities) {
+		echo '<div style="max-width: 800px; margin: 50px auto; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">';
+		echo '<h2 style="color: #333; margin-top: 0;">📹 Select Video Quality</h2>';
+		echo '<h3 style="color: #666; font-weight: normal; margin-bottom: 30px;">' . htmlspecialchars($title) . '</h3>';
+		
+		echo '<div style="margin-bottom: 30px;">';
+		krsort($availableQualities); // Sort descending (1080p first)
+		foreach ($availableQualities as $q => $url) {
+			$downloadUrl = $originalUrl . '&ph_quality=' . $q;
+			$sizeEstimate = '';
+			switch($q) {
+				case 1080: $sizeEstimate = '~200-400 MB'; break;
+				case 720: $sizeEstimate = '~100-200 MB'; break;
+				case 480: $sizeEstimate = '~50-100 MB'; break;
+				case 360: $sizeEstimate = '~30-60 MB'; break;
+				case 240: $sizeEstimate = '~20-40 MB'; break;
+			}
+			
+			$bgColor = $q >= 720 ? '#e8f5e9' : '#fff3e0';
+			$borderColor = $q >= 720 ? '#4caf50' : '#ff9800';
+			$badge = $q == 1080 ? '<span style="background: #f44336; color: #fff; padding: 2px 8px; border-radius: 3px; font-size: 11px; margin-left: 10px;">BEST</span>' : '';
+			
+			echo '<a href="' . htmlspecialchars($downloadUrl) . '" style="display: block; padding: 20px; margin-bottom: 15px; background: ' . $bgColor . '; border: 2px solid ' . $borderColor . '; border-radius: 6px; text-decoration: none; color: #000; transition: all 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">';
+			echo '<div style="font-size: 24px; font-weight: bold; color: ' . $borderColor . ';">' . $q . 'p' . $badge . '</div>';
+			echo '<div style="margin-top: 5px; color: #666;">Resolution: ' . $this->getResolution($q) . '</div>';
+			if ($sizeEstimate) {
+				echo '<div style="margin-top: 5px; color: #999; font-size: 14px;">Estimated size: ' . $sizeEstimate . '</div>';
+			}
+			echo '</a>';
+		}
+		echo '</div>';
+		
+		echo '<div style="padding: 15px; background: #f5f5f5; border-radius: 4px; color: #666; font-size: 14px;">';
+		echo '<strong>💡 Tip:</strong> Higher quality = better video but larger file size and longer download time.';
+		echo '</div>';
+		
+		echo '<div style="margin-top: 20px; text-align: center;">';
+		echo '<a href="?" style="color: #2196f3; text-decoration: none;">← Back to main page</a>';
+		echo '</div>';
+		
+		echo '</div>';
+	}
+	
+	/**
+	 * Get resolution string for quality
+	 */
+	private function getResolution($quality) {
+		$resolutions = array(
+			1080 => '1920x1080 (Full HD)',
+			720 => '1280x720 (HD)',
+			480 => '854x480 (SD)',
+			360 => '640x360',
+			240 => '426x240'
+		);
+		return isset($resolutions[$quality]) ? $resolutions[$quality] : $quality . 'p';
 	}
 }
 
