@@ -366,14 +366,7 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('Filename: ' . $filename);
 		$this->addDebug('Quality: ' . ($quality ? $quality . 'p' : 'unknown'));
 		
-		// Always show debug info before download
-		echo $this->showDebugInfo();
-		echo '<div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px;">';
-		echo '<h3 style="color: #2e7d32; margin-top: 0;">Starting Download...</h3>';
-		echo '<p><strong>Quality:</strong> ' . ($quality ? $quality . 'p' : 'best available') . '</p>';
-		echo '<p><strong>URL Type:</strong> ' . (strpos($downloadUrl, '.m3u8') !== false ? 'HLS Stream (m3u8)' : 'Direct MP4') . '</p>';
-		echo '<p style="word-break: break-all;"><strong>URL:</strong> ' . htmlspecialchars(substr($downloadUrl, 0, 200)) . (strlen($downloadUrl) > 200 ? '...' : '') . '</p>';
-		echo '</div>';
+		// Don't show debug here - will be shown at bottom only
 		
 		$this->changeMesg(lang(300) . '<br />Pornhub: Downloading video (' . ($quality ? $quality . 'p' : 'best quality') . ')...');
 		
@@ -573,10 +566,9 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('Output file: ' . $filename);
 		
 		// Wrap everything in centered container
-		echo '<div style="max-width: 900px; margin: 0 auto; padding: 20px;">';
+		echo '<div style="max-width: 900px; margin: 50px auto; padding: 20px;">';
 		
-		// Show debug info and progress
-		echo $this->showDebugInfo();
+		// Show progress (debug will be shown at bottom only)
 		echo '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; color: #000;">';
 		echo '<h3 style="color: #1976d2; margin-top: 0;">Downloading HLS Stream</h3>';
 		echo '<p><strong>Quality:</strong> ' . $quality . 'p (1080p)</p>';
