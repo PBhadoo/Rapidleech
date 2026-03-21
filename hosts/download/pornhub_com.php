@@ -31,7 +31,11 @@ class pornhub_com extends DownloadClass {
 		
 		// Get the video page with cookies for age verification
 		$page = $this->GetPage($videoUrl, 'accessAgeDisclaimerPH=1', 0, 0, 0, 0, 0, 0,
-			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+			'Accept-Language: en-US,en;q=0.9',
+			'Sec-Fetch-Dest: document',
+			'Sec-Fetch-Mode: navigate',
+			'Sec-Fetch-Site: same-origin'
 		);
 		
 		// Extract video title
@@ -148,7 +152,11 @@ class pornhub_com extends DownloadClass {
 		
 		// Make request to get_media endpoint
 		$mediaPage = $this->GetPage($getMediaUrl, 'accessAgeDisclaimerPH=1', 0, $referer, 0, 0, 0, 0,
-			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+			'Accept-Language: en-US,en;q=0.9',
+			'Referer: https://www.pornhub.com/',
+			'Sec-Fetch-Dest: empty',
+			'Sec-Fetch-Mode: cors'
 		);
 		
 		// Debug: Log raw response (first 2000 chars)
@@ -159,17 +167,22 @@ class pornhub_com extends DownloadClass {
 		// Extract just the JSON body - remove HTTP headers
 		$jsonBody = $mediaPage;
 		
-		// Remove HTTP headers if present
-		if (($pos = strpos($mediaPage, "\r\n\r\n")) !== false) {
-			$jsonBody = substr($mediaPage, $pos + 4);
-		} elseif (($pos = strpos($mediaPage, "\n\n")) !== false) {
-			$jsonBody = substr($mediaPage, $pos + 2);
-		}
-		
-		// Trim and find JSON array
-		$jsonBody = trim($jsonBody);
-		if (($jsonStart = strpos($jsonBody, '[')) !== false) {
-			$jsonBody = substr($jsonBody, $jsonStart);
+		// Handle potential JSONP response
+		if (strpos($mediaPage, 'callback(') === 0) {
+			$jsonBody = preg_replace('/^callback\(|\);?\s*$/', '', $mediaPage);
+		} else {
+			// Remove HTTP headers if present
+			if (($pos = strpos($mediaPage, "\r\n\r\n")) !== false) {
+				$jsonBody = substr($mediaPage, $pos + 4);
+			} elseif (($pos = strpos($mediaPage, "\n\n")) !== false) {
+				$jsonBody = substr($mediaPage, $pos + 2);
+			}
+			
+			// Trim and find JSON array
+			$jsonBody = trim($jsonBody);
+			if (($jsonStart = strpos($jsonBody, '[')) !== false) {
+				$jsonBody = substr($jsonBody, $jsonStart);
+			}
 		}
 		
 		// Debug: Log parsed JSON body
@@ -179,7 +192,19 @@ class pornhub_com extends DownloadClass {
 		$bestQuality = 0;
 		
 		// Parse JSON response
-		$mediaData = @json_decode($jsonBody, true);
+		// Add error handling for JSON parsing
+		$mediaData = json_decode($jsonBody, true);
+		if (json_last_error() !== JSON_ERROR_NONE) {
+			// Attempt to fix common JSON issues
+			$jsonBody = preg_replace('/,\s*([}\]])/', '$1', $jsonBody); // Remove trailing commas
+			$jsonBody = preg_replace('/([{,]\s*)(\w+)(\s*:)/', '$1"$2"$3', $jsonBody); // Add quotes around keys
+			$mediaData = json_decode($jsonBody, true);
+			
+			if (json_last_error() !== JSON_ERROR_NONE) {
+				@file_put_contents(DOWNLOAD_DIR . 'pornhub_debug.log', "\n\nJSON Parse Error: " . json_last_error_msg(), FILE_APPEND);
+				return array('url' => '', 'quality' => '');
+			}
+		}
 		
 		if (is_array($mediaData) && !empty($mediaData)) {
 			foreach ($mediaData as $item) {
