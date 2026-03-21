@@ -44,6 +44,9 @@ while (false !== ($entry = $d->read())) {
 			case 'xvideos.com':
 				$host['xnxx.com'] = $host['xvideos.com'];
 				break;
+			case 'pornhub.com':
+				foreach(array('pornhub.org', 'pornhubpremium.com', 'pornhubpremium.org') as $phdomain) $host["$phdomain"] = $host['pornhub.com'];
+				break;
 		}
 	}
 }
