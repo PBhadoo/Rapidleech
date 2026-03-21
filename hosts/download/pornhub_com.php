@@ -24,7 +24,7 @@ class pornhub_com extends DownloadClass {
 		if (!empty($this->debugInfo)) {
 			$debugHtml = '<div style="margin: 20px 0; padding: 15px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px;">';
 			$debugHtml .= '<h3 style="margin-top: 0; color: #333;">Debug Information:</h3>';
-			$debugHtml .= '<textarea readonly style="width: 100%; height: 400px; font-family: monospace; font-size: 12px; padding: 10px; background: #fff; border: 1px solid #ccc;">';
+			$debugHtml .= '<textarea readonly style="width: 100%; height: 400px; font-family: monospace; font-size: 12px; padding: 10px; background: #fff; color: #000; border: 1px solid #ccc;">';
 			$debugHtml .= htmlspecialchars(implode("\n", $this->debugInfo));
 			$debugHtml .= '</textarea></div>';
 			return $debugHtml;
@@ -162,6 +162,31 @@ class pornhub_com extends DownloadClass {
 				$this->addDebug('Method 3 SUCCESS: Selected ' . $quality . 'p quality');
 			} else {
 				$this->addDebug('Method 3: No mediaDefinitions mp4 URLs found');
+			}
+		}
+		
+		// Method 4: Extract mp4 URLs from HLS m3u8 streams (NEW - for server environments)
+		if (empty($downloadUrl)) {
+			$this->addDebug('Method 4: Looking for HLS m3u8 streams with embedded mp4 URLs...');
+			// Pattern: "videoUrl":"https://hv-h.phncdn.com/hls/.../1080P_4000K_xxx.mp4/master.m3u8?..."
+			if (preg_match_all('@"videoUrl"\s*:\s*"(https?://[^"]+/(\d+)P_[^/]+\.mp4)/master\.m3u8[^"]*"@', $page, $matches, PREG_SET_ORDER)) {
+				$this->addDebug('Found ' . count($matches) . ' HLS streams with mp4 paths');
+				$bestQuality = 0;
+				foreach ($matches as $match) {
+					$url = stripcslashes($match[1]); // Extract just the mp4 URL without /master.m3u8
+					$q = intval($match[2]); // Quality from URL
+					$this->addDebug('  - Quality ' . $q . 'p: ' . $url);
+					if ($q > $bestQuality) {
+						$bestQuality = $q;
+						$downloadUrl = $url;
+						$quality = strval($q);
+					}
+				}
+				if (!empty($downloadUrl)) {
+					$this->addDebug('Method 4 SUCCESS: Selected ' . $quality . 'p (extracted from HLS)');
+				}
+			} else {
+				$this->addDebug('Method 4: No HLS streams with mp4 paths found');
 			}
 		}
 		
