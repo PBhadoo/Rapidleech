@@ -565,8 +565,8 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('Total segments: ' . count($segments));
 		$this->addDebug('Output file: ' . $filename);
 		
-		// Wrap everything in centered container with strong centering
-		echo '<div style="max-width: 900px; margin-left: auto !important; margin-right: auto !important; margin-top: 50px; margin-bottom: 50px; padding: 20px; display: block;">';
+		// Wrap everything in centered table
+		echo '<table width="900" style="margin-left: auto; margin-right: auto; margin-top: 20px; margin-bottom: 20px;"><tr><td>';
 		
 		// Show progress (debug will be shown at bottom only)
 		echo '<div style="margin: 20px auto; padding: 15px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; color: #000; text-align: left;">';
@@ -674,11 +674,11 @@ class pornhub_com extends DownloadClass {
 			echo '</div>';
 			echo '</div>';
 			
-			// Close centered container
-			echo '</div>';
+			// Close centered table
+			echo '</td></tr></table>';
 		} else {
 			@unlink($tempFile);
-			echo '</div>'; // Close centered container
+			echo '</td></tr></table>';
 			html_error('Failed to download any video segments. All requests failed.');
 		}
 	}
@@ -687,7 +687,8 @@ class pornhub_com extends DownloadClass {
 	 * Show quality selector UI - uses forms to preserve POST data
 	 */
 	private function showQualitySelector($originalLink, $viewkey, $title, $availableQualities) {
-		echo '<div style="max-width: 800px; margin-left: auto !important; margin-right: auto !important; margin-top: 50px; margin-bottom: 50px; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); color: #000; display: block;">';
+		// Outer wrapper to center in page using table
+		echo '<table width="800" style="margin-left: auto; margin-right: auto; margin-top: 20px; margin-bottom: 20px;"><tr><td style="padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); color: #000;">';
 		echo '<h2 style="color: #333; margin-top: 0;">📹 Select Video Quality</h2>';
 		echo '<h3 style="color: #666; font-weight: normal; margin-bottom: 30px;">' . htmlspecialchars($title) . '</h3>';
 		
@@ -739,7 +740,7 @@ class pornhub_com extends DownloadClass {
 		echo '<a href="?" style="color: #2196f3; text-decoration: none;">← Back to main page</a>';
 		echo '</div>';
 		
-		echo '</div>';
+		echo '</td></tr></table>';
 	}
 	
 	/**
