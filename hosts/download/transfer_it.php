@@ -64,8 +64,23 @@ class transfer_it extends DownloadClass {
 			html_error('Transfer key not found. The transfer may have expired or is invalid.');
 		}
 
-		// Step 4: Decode root folder key
-		$folderKey = $this->base64_to_a32($rootNode['k']);
+		// Step 4: Decode root folder key  
+		// Transfer.it root keys can be in format "handle:key" or just "key"
+		$rootKeyStr = $rootNode['k'];
+		if (strpos($rootKeyStr, ':') !== false) {
+			list(, $rootKeyStr) = explode(':', $rootKeyStr, 2);
+		}
+		// Also handle slash-separated multi-keys
+		if (strpos($rootKeyStr, '/') !== false) {
+			$parts = explode('/', $rootKeyStr);
+			foreach ($parts as $part) {
+				if (strpos($part, ':') !== false) {
+					list(, $rootKeyStr) = explode(':', $part, 2);
+					break;
+				}
+			}
+		}
+		$folderKey = $this->base64_to_a32($rootKeyStr);
 
 		// Step 5: For each file, decrypt the key and build download info
 		$downloadFiles = array();
