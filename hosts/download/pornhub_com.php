@@ -210,6 +210,15 @@ class pornhub_com extends DownloadClass {
 						$variantContent = $this->GetPage($variantUrl, 0, 0, $videoUrl);
 						$this->addDebug('Variant playlist length: ' . strlen($variantContent) . ' bytes');
 						
+						// Strip HTTP headers from variant playlist
+						if (($pos = strpos($variantContent, "\r\n\r\n")) !== false) {
+							$variantContent = substr($variantContent, $pos + 4);
+						} elseif (($pos = strpos($variantContent, "\n\n")) !== false) {
+							$variantContent = substr($variantContent, $pos + 2);
+						}
+						$variantContent = trim($variantContent);
+						$this->addDebug('Variant playlist content (first 500 chars): ' . substr($variantContent, 0, 500));
+						
 						// Extract .ts segments or direct mp4 URL
 						if (preg_match('@#EXTINF:[^\n]*\n([^\n]+\.(ts|mp4))@', $variantContent, $segmentMatch)) {
 							$segmentUrl = $segmentMatch[1];
@@ -228,11 +237,9 @@ class pornhub_com extends DownloadClass {
 							}
 						}
 					} else {
-						// Try direct mp4 path (remove /master.m3u8)
-						$directMp4 = preg_replace('@/master\.m3u8.*$@', '', $bestM3u8Url);
-						$this->addDebug('Trying direct mp4 path: ' . $directMp4);
-						$downloadUrl = $directMp4;
-						$this->addDebug('Method 4: Using direct mp4 path (experimental)');
+						$this->addDebug('Method 4: HLS video uses segmented streaming (.ts files)');
+						$this->addDebug('NOTE: Segmented HLS videos cannot be downloaded directly.');
+						$this->addDebug('This video requires a premium Pornhub account or different download method.');
 					}
 				}
 			} else {
