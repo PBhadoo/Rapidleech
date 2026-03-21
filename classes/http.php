@@ -1373,7 +1373,7 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
     
     // Merge chunks into final file
     if (function_exists('rl_log')) rl_log('INFO', 'Starting chunk merge', array('filename' => $FileName, 'chunks' => $numChunks, 'totalSize' => bytesToKbOrMbOrGb($fileSize)));
-    echo "<script type='text/javascript'>merging();</script>";
+    echo "<script type='text/javascript'>document.title='Merging Parts...';var _ht=document.getElementById('dl-heading-text');if(_ht)_ht.textContent='Merging Parts...';var _hd=document.getElementById('dl-heading');if(_hd)_hd.style.color='#f59e0b';var _pb=document.getElementById('progress');if(_pb){_pb.style.width='100%';_pb.style.background='linear-gradient(90deg,#f59e0b,#d97706)';}</script>\n";
     flush();
     $finalFp = @fopen($saveToFile, 'wb');
     if (!$finalFp) {
