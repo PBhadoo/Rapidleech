@@ -53,6 +53,14 @@ function pr(percent, received, speed) {
   return true;
 }
 
+function merging() {
+  var pb=document.getElementById('progress');
+  if(pb){pb.style.width='100%';pb.style.background='linear-gradient(90deg,#f59e0b,#d97706)';pb.style.animation='pulse 1.5s ease-in-out infinite';}
+  document.title='Merging Parts...';
+  if(!document.getElementById('rl-merge-style')){var s=document.createElement('style');s.id='rl-merge-style';s.textContent='@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}';document.head.appendChild(s);}
+  return true;
+}
+
 function mail(str, field)
 {
 	document.getElementById('mailPart.' + field).innerHTML = str;

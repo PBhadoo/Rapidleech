@@ -58,12 +58,41 @@ function pr(percent, received, speed) {
         if (progressBar) {
             progressBar.style.width = '100%';
             progressBar.style.background = 'linear-gradient(90deg, #22c55e, #16a34a)';
+            progressBar.style.animation = 'none';
         }
         document.title = 'Download Complete!';
     } else {
         document.title = `${percent}% Downloaded`;
     }
 
+    return true;
+}
+
+function merging() {
+    var headingText = document.getElementById('dl-heading-text');
+    var iconDownloading = document.getElementById('dl-icon-downloading');
+    var iconComplete = document.getElementById('dl-icon-complete');
+    var heading = document.getElementById('dl-heading');
+    var progressBar = document.getElementById('progress');
+    
+    if (headingText) headingText.textContent = 'Merging Parts...';
+    if (iconDownloading) iconDownloading.style.display = 'none';
+    if (iconComplete) iconComplete.style.display = 'none';
+    if (heading) heading.style.color = 'var(--warning, #f59e0b)';
+    if (progressBar) {
+        progressBar.style.width = '100%';
+        progressBar.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+        progressBar.style.animation = 'pulse 1.5s ease-in-out infinite';
+    }
+    document.title = 'Merging Parts...';
+    
+    // Add pulse animation if not exists
+    if (!document.getElementById('rl-merge-style')) {
+        var style = document.createElement('style');
+        style.id = 'rl-merge-style';
+        style.textContent = '@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }';
+        document.head.appendChild(style);
+    }
     return true;
 }
 
