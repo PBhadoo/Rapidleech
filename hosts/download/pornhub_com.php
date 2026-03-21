@@ -211,14 +211,16 @@ class pornhub_com extends DownloadClass {
 					
 					// Parse m3u8 to find the actual mp4 URL or segments
 					// Look for the highest bitrate variant
-					if (preg_match('@#EXT-X-STREAM-INF:[^\n]*\n([^\n]+\.m3u8)@', $m3u8Body, $variantMatch)) {
-						$variantUrl = $variantMatch[1];
-						// If relative URL, make it absolute
+					if (preg_match('@#EXT-X-STREAM-INF:[^\n]*\n([^\n]+\.m3u8[^\n]*)@', $m3u8Body, $variantMatch)) {
+						$variantUrl = trim($variantMatch[1]);
+						$this->addDebug('Found variant playlist (relative): ' . $variantUrl);
+						
+						// If relative URL, make it absolute while preserving query parameters
 						if (strpos($variantUrl, 'http') !== 0) {
-							$baseUrl = preg_replace('@/[^/]*$@', '/', $bestM3u8Url);
+							$baseUrl = preg_replace('@/[^/]*\?.*$|/[^/]*$@', '/', $bestM3u8Url);
 							$variantUrl = $baseUrl . $variantUrl;
 						}
-						$this->addDebug('Found variant playlist: ' . $variantUrl);
+						$this->addDebug('Found variant playlist (absolute): ' . $variantUrl);
 						
 						// Fetch the variant playlist - NO Origin header
 						$variantContent = $this->GetPage($variantUrl, 0, 0, $bestM3u8Url, 0, 0, 0, 0,
