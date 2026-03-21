@@ -572,6 +572,9 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('Total segments: ' . count($segments));
 		$this->addDebug('Output file: ' . $filename);
 		
+		// Wrap everything in centered container
+		echo '<div style="max-width: 900px; margin: 0 auto; padding: 20px;">';
+		
 		// Show debug info and progress
 		echo $this->showDebugInfo();
 		echo '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; color: #000;">';
@@ -650,8 +653,8 @@ class pornhub_com extends DownloadClass {
 			$fileSize = @filesize($outputPath);
 			$fileSizeMB = round($fileSize / (1024 * 1024), 2);
 			
-			// Create download URL
-			$downloadLink = '?GO=files&file=' . urlencode($filename);
+			// Create download URL - use relative path from web root
+			$downloadLink = 'files/' . $filename;
 			
 			echo '<div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px; color: #000;">';
 			echo '<h3 style="color: #2e7d32; margin-top: 0;">✓ Download Complete!</h3>';
@@ -678,8 +681,12 @@ class pornhub_com extends DownloadClass {
 			echo $this->showDebugInfo();
 			echo '</div>';
 			echo '</div>';
+			
+			// Close centered container
+			echo '</div>';
 		} else {
 			@unlink($tempFile);
+			echo '</div>'; // Close centered container
 			html_error('Failed to download any video segments. All requests failed.');
 		}
 	}
