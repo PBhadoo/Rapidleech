@@ -168,9 +168,9 @@ class pornhub_com extends DownloadClass {
 		// Method 4: Extract mp4 URLs from HLS m3u8 streams (NEW - for server environments)
 		if (empty($downloadUrl)) {
 			$this->addDebug('Method 4: Looking for HLS m3u8 streams with embedded mp4 URLs...');
-			// Pattern: "videoUrl":"https:\/\/kv-h.phncdn.com\/hls\/.../1080P_4000K_xxx.mp4\/master.m3u8?..."
-			// Handle both escaped (\/) and unescaped (/) slashes
-			if (preg_match_all('@"videoUrl"\s*:\s*"(https?:[^"]+?/(\d+)P_[^/]+?\.mp4)/master\.m3u8[^"]*"@', $page, $matches, PREG_SET_ORDER)) {
+			// Pattern: "videoUrl":"https:\/\/ev-h.phncdn.com\/hls\/.../1080P_4000K_xxx.mp4\/master.m3u8?..."
+			// Match escaped slashes in JSON: \/
+			if (preg_match_all('@"videoUrl":"(https?:\\\\/\\\\/[^"]+?\\\\/(\d+)P_[^"\\\\]+\.mp4)\\\\/master\.m3u8@', $page, $matches, PREG_SET_ORDER)) {
 				$this->addDebug('Found ' . count($matches) . ' HLS streams with mp4 paths');
 				$bestQuality = 0;
 				foreach ($matches as $match) {
