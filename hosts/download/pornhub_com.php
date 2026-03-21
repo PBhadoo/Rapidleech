@@ -254,6 +254,18 @@ class pornhub_com extends DownloadClass {
 							$this->addDebug('Base URL for segments: ' . $baseUrl);
 							$this->addDebug('Total segments to download: ' . count($segments));
 							
+							// Prepare filename before calling download
+							$filename = preg_replace('@[^\w\s\-\.\(\)\[\]]@u', '_', $title);
+							$filename = preg_replace('@_+@', '_', $filename);
+							$filename = preg_replace('@\s+@', '_', $filename);
+							$filename = trim($filename, '_');
+							$filename = substr($filename, 0, 180);
+							if (!empty($quality)) {
+								$filename .= "_[{$quality}p]";
+							}
+							$filename .= '_[pornhub].mp4';
+							$this->addDebug('Output filename: ' . $filename);
+							
 							// Download all HLS segments and merge them
 							$this->downloadHLSSegments($segments, $baseUrl, $filename, $quality, $videoUrl);
 							exit; // Stop execution after HLS download
@@ -534,12 +546,13 @@ class pornhub_com extends DownloadClass {
 		
 		// Show debug info and progress
 		echo $this->showDebugInfo();
-		echo '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px;">';
+		echo '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; color: #000;">';
 		echo '<h3 style="color: #1976d2; margin-top: 0;">Downloading HLS Stream</h3>';
 		echo '<p><strong>Quality:</strong> ' . $quality . 'p (1080p)</p>';
 		echo '<p><strong>Segments:</strong> ' . count($segments) . ' parts</p>';
 		echo '<p><strong>Method:</strong> Downloading and merging .ts segments</p>';
-		echo '<div id="progress" style="margin-top: 15px;"></div>';
+		echo '<p><strong>Output:</strong> ' . htmlspecialchars($filename) . '</p>';
+		echo '<div id="progress" style="margin-top: 15px; font-weight: bold;"></div>';
 		echo '</div>';
 		flush();
 		
@@ -561,18 +574,25 @@ class pornhub_com extends DownloadClass {
 			$segment = trim($segment);
 			$segmentUrl = strpos($segment, 'http') === 0 ? $segment : $baseUrl . $segment;
 			
-			// Progress update every 10 segments
-			if ($idx % 10 == 0 || $idx == $totalSegments - 1) {
-				$progress = round(($idx / $totalSegments) * 100);
-				echo '<script>document.getElementById("progress").innerHTML = "Downloading segment ' . ($idx + 1) . '/' . $totalSegments . ' (' . $progress . '%)";</script>';
+			// Progress update every 5 segments
+			if ($idx % 5 == 0 || $idx == $totalSegments - 1) {
+				$progress = round((($idx + 1) / $totalSegments) * 100);
+				$sizeSoFar = @filesize($tempFile);
+				$sizeMB = $sizeSoFar > 0 ? round($sizeSoFar / (1024 * 1024), 2) : 0;
+				echo '<script>document.getElementById("progress").innerHTML = "Downloading segment ' . ($idx + 1) . '/' . $totalSegments . ' (' . $progress . '%) - ' . $sizeMB . ' MB downloaded";</script>';
 				flush();
 			}
 			
-			// Download segment
+			// Download segment with detailed debugging for first 3
 			$segmentData = $this->GetPage($segmentUrl, 0, 0, $referer, 0, 0, 0, 0,
 				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
 				'Accept: */*'
 			);
+			
+			if ($idx < 3) {
+				$this->addDebug('Segment ' . ($idx + 1) . ' raw length: ' . strlen($segmentData) . ' bytes');
+				$this->addDebug('Segment ' . ($idx + 1) . ' first 200 chars: ' . substr($segmentData, 0, 200));
+			}
 			
 			// Strip HTTP headers if present
 			if (($pos = strpos($segmentData, "\r\n\r\n")) !== false) {
@@ -602,15 +622,17 @@ class pornhub_com extends DownloadClass {
 			$fileSize = @filesize($outputPath);
 			$fileSizeMB = round($fileSize / (1024 * 1024), 2);
 			
-			echo '<div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px;">';
+			echo '<div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px; color: #000;">';
 			echo '<h3 style="color: #2e7d32; margin-top: 0;">✓ Download Complete!</h3>';
 			echo '<p><strong>Downloaded:</strong> ' . $downloadedCount . '/' . $totalSegments . ' segments</p>';
 			if ($failedCount > 0) {
-				echo '<p><strong>Failed:</strong> ' . $failedCount . ' segments (may cause playback issues)</p>';
+				echo '<p style="color: #f57c00;"><strong>Failed:</strong> ' . $failedCount . ' segments (may cause playback issues)</p>';
 			}
-			echo '<p><strong>File Size:</strong> ' . $fileSizeMB . ' MB</p>';
+			echo '<p><strong>File Size:</strong> ' . $fileSizeMB . ' MB (' . number_format($fileSize) . ' bytes)</p>';
 			echo '<p><strong>Saved to:</strong> ' . htmlspecialchars($filename) . '</p>';
+			echo '<p><strong>Location:</strong> ' . htmlspecialchars(DOWNLOAD_DIR . $filename) . '</p>';
 			echo '</div>';
+			echo '<div style="margin: 20px 0;"><a href="' . htmlspecialchars('?GO=files') . '" style="display: inline-block; padding: 10px 20px; background: #2196f3; color: #fff; text-decoration: none; border-radius: 4px;">View Downloaded Files</a></div>';
 		} else {
 			@unlink($tempFile);
 			html_error('Failed to download any video segments. All requests failed.');
