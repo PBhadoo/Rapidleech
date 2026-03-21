@@ -151,6 +151,11 @@ class pornhub_com extends DownloadClass {
 			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 		);
 		
+		// Debug: Log raw response (first 2000 chars)
+		$debugLog = "get_media response length: " . strlen($mediaPage) . "\n";
+		$debugLog .= "First 2000 chars:\n" . substr($mediaPage, 0, 2000);
+		@file_put_contents(DOWNLOAD_DIR . 'pornhub_debug.log', $debugLog);
+		
 		// Extract just the JSON body - remove HTTP headers
 		$jsonBody = $mediaPage;
 		
@@ -166,6 +171,9 @@ class pornhub_com extends DownloadClass {
 		if (($jsonStart = strpos($jsonBody, '[')) !== false) {
 			$jsonBody = substr($jsonBody, $jsonStart);
 		}
+		
+		// Debug: Log parsed JSON body
+		@file_put_contents(DOWNLOAD_DIR . 'pornhub_debug.log', "\n\nParsed JSON body:\n" . $jsonBody, FILE_APPEND);
 		
 		$downloadUrl = '';
 		$bestQuality = 0;
