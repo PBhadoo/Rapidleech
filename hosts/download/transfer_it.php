@@ -94,6 +94,20 @@ class transfer_it extends DownloadClass {
 			if ($node['t'] == 0) {
 				// File node - key is raw (NOT encrypted with folder key)
 				$rawKey = $node['k'];
+				
+				// Handle keys in format "handle:key" or "handle:key/handle:key"
+				if (strpos($rawKey, '/') !== false || strpos($rawKey, ':') !== false) {
+					$parts = explode('/', $rawKey);
+					$found = '';
+					foreach ($parts as $part) {
+						if (strpos($part, ':') !== false) {
+							list(, $found) = explode(':', $part, 2);
+							break;
+						}
+					}
+					if (!empty($found)) $rawKey = $found;
+				}
+				
 				$keyA32 = $this->base64_to_a32($rawKey);
 
 				if (count($keyA32) < 8) continue;
@@ -120,7 +134,13 @@ class transfer_it extends DownloadClass {
 		}
 
 		if (empty($fileNodes)) {
-			html_error('No downloadable files found in this transfer.');
+			// Debug: show what the API returned
+			$dbg = '<br><b>Debug Info:</b><br>';
+			$dbg .= 'Total nodes: ' . count($nodes) . '<br>';
+			foreach ($nodes as $i => $node) {
+				$dbg .= "Node $i: t={$node['t']}, h={$node['h']}, k=" . (isset($node['k']) ? htmlspecialchars(substr($node['k'], 0, 80)) : 'N/A') . '<br>';
+			}
+			html_error('No downloadable files found in this transfer.' . $dbg);
 		}
 
 		// Step 4: Download
