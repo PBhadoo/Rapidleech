@@ -14,6 +14,9 @@ ob_implicit_flush(true);
 header('X-Accel-Buffering: no');
 clearstatcache();
 error_reporting(6135);
+// Enable PHP error logging to file for debugging
+@ini_set('log_errors', 1);
+@ini_set('error_log', (defined('CONFIG_DIR') ? CONFIG_DIR : 'configs/') . 'php_errors.log');
 $nn = "\r\n";
 $fromaddr = 'RapidLeech';
 $dev_name = 'Development Stage';
