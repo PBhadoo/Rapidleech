@@ -72,7 +72,6 @@ class pornhub_com extends DownloadClass {
 		$this->addDebug('Page first 500 chars: ' . substr($page, 0, 500));
 		
 		// Extract video title
-		// Extract video title
 		$title = 'pornhub_video';
 		if (preg_match('@<title>([^<]+)</title>@i', $page, $tm)) {
 			$title = trim(str_replace(' - Pornhub.com', '', $tm[1]));
@@ -104,7 +103,6 @@ class pornhub_com extends DownloadClass {
 		// Method 1 (PRIORITY): Use get_media API - URLs are bound to THIS server's IP
 		// This is the most reliable method when running on a server
 		$this->addDebug('Method 1: Looking for get_media API URL...');
-		if (preg_match('@"videoUrl"\s*:\s*"(https?:[^"]*get_media[^"]*)"@', $page, $gm)) {
 		if (preg_match('@"videoUrl"\s*:\s*"(https?:[^"]*get_media[^"]*)"@', $page, $gm)) {
 			$getMediaUrl = stripcslashes($gm[1]);
 			$this->addDebug('Found get_media URL: ' . $getMediaUrl);
@@ -148,7 +146,6 @@ class pornhub_com extends DownloadClass {
 		// Method 3: Try direct mp4 URLs from mediaDefinitions (non-HLS, non-remote)
 		if (empty($downloadUrl)) {
 			$this->addDebug('Method 3: Looking for mediaDefinitions mp4 URLs...');
-			if (preg_match_all('@"format"\s*:\s*"mp4"[^}]*"videoUrl"\s*:\s*"(https?://ev\.phncdn\.com[^"]+)"[^}]*"quality"\s*:\s*"(\d+)"@', $page, $matches, PREG_SET_ORDER)) {
 			if (preg_match_all('@"format"\s*:\s*"mp4"[^}]*"videoUrl"\s*:\s*"(https?://ev\.phncdn\.com[^"]+)"[^}]*"quality"\s*:\s*"(\d+)"@', $page, $matches, PREG_SET_ORDER)) {
 				$this->addDebug('Found ' . count($matches) . ' mp4 URLs in mediaDefinitions');
 				$bestQuality = 0;
