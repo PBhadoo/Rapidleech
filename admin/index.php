@@ -206,6 +206,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'success';
             break;
 
+        case 'save_ytdlp_cookies':
+            $cookies = $_POST['ytdlp_cookies_content'] ?? '';
+            $cookiePath = $rootDir . '/configs/ytdlp_cookies.txt';
+            if ($cookies === '' || trim($cookies) === '') {
+                // Clear cookies
+                @unlink($cookiePath);
+                rl_log_admin('yt-dlp cookies', 'Cookies cleared');
+                $message = 'yt-dlp cookies cleared.';
+                $messageType = 'success';
+            } else {
+                if (@file_put_contents($cookiePath, $cookies)) {
+                    @chmod($cookiePath, 0644);
+                    rl_log_admin('yt-dlp cookies', 'Cookies saved (' . strlen($cookies) . ' bytes)');
+                    $message = 'yt-dlp cookies saved successfully. Login-required videos should now work.';
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to save cookies file. Check configs/ directory permissions.';
+                    $messageType = 'error';
+                }
+            }
+            break;
+
         case 'update_ytdlp':
             $ytdlpInfo = getInstalledYtdlpVersion();
             $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
@@ -469,6 +491,36 @@ label.check input{accent-color:#6366f1}
             else{document.querySelector('#ytdlp-latest .tag').textContent='Could not check';document.querySelector('#ytdlp-latest .tag').className='tag tag-yellow';}
         }).catch(()=>{document.querySelector('#ytdlp-latest .tag').textContent='Error';document.querySelector('#ytdlp-latest .tag').className='tag tag-red';});
         </script>
+
+        <!-- yt-dlp Cookies -->
+        <?php
+        $ytdlpCookiePath = $rootDir . '/configs/ytdlp_cookies.txt';
+        $ytdlpCookiesContent = @file_get_contents($ytdlpCookiePath) ?: '';
+        $hasCookies = !empty(trim($ytdlpCookiesContent));
+        ?>
+        <div style="margin-top:20px;padding-top:20px;border-top:1px solid #282d3e">
+            <h3 style="color:#818cf8;font-size:15px;margin-bottom:8px">🍪 Browser Cookies (for login-required videos)</h3>
+            <p style="color:#606880;font-size:13px;margin-bottom:12px">
+                Some YouTube videos require login. Export cookies from your browser and paste them here.<br>
+                <strong>How:</strong> Install <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" style="color:#818cf8">Get cookies.txt LOCALLY</a> extension →
+                Log into YouTube → Click extension → Export → Paste below.
+            </p>
+            <div style="margin-bottom:8px">
+                <span style="color:#606880;font-size:13px">Status:</span>
+                <span class="tag <?php echo $hasCookies ? 'tag-green' : 'tag-yellow'; ?>"><?php echo $hasCookies ? 'Cookies loaded (' . strlen($ytdlpCookiesContent) . ' bytes)' : 'No cookies set'; ?></span>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="save_ytdlp_cookies">
+                <textarea name="ytdlp_cookies_content" rows="8" placeholder="# Netscape HTTP Cookie File&#10;# Paste your exported cookies.txt content here...&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;0&#9;cookie_name&#9;cookie_value"><?php echo htmlspecialchars($ytdlpCookiesContent); ?></textarea>
+                <br><br>
+                <div class="flex">
+                    <button type="submit" class="btn btn-primary">🍪 Save Cookies</button>
+                    <?php if ($hasCookies): ?>
+                    <button type="submit" class="btn btn-danger" onclick="document.querySelector('textarea[name=ytdlp_cookies_content]').value='';return true;">🗑️ Clear Cookies</button>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Git Update -->
