@@ -376,8 +376,8 @@ class ytdlp_universal extends DownloadClass {
 				}
 			}
 
-			$debugBlock = '<br/><br/><details><summary>Full yt-dlp output (click to expand)</summary>'
-				. '<pre style="text-align:left;max-height:400px;overflow:auto;background:#1e1e2e;color:#cdd6f4;padding:12px;border-radius:6px;font-size:12px;">'
+			$debugBlock = '<br/><br/><details style="max-width:100%;overflow:hidden;"><summary>Full yt-dlp output (click to expand)</summary>'
+				. '<pre style="text-align:left;max-height:400px;overflow:auto;background:#1e1e2e;color:#cdd6f4;padding:12px;border-radius:6px;font-size:12px;white-space:pre-wrap;word-wrap:break-word;word-break:break-all;max-width:100%;">'
 				. htmlspecialchars($allOutput)
 				. '</pre></details>';
 
