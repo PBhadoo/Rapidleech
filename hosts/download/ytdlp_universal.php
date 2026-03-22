@@ -147,6 +147,14 @@ class ytdlp_universal extends DownloadClass {
 		$confLines .= "--no-mtime\n";
 		$confLines .= "--merge-output-format mp4\n";
 		$confLines .= "--print after_move:filepath\n";
+
+		// Cookie support: if a cookies.txt file exists in configs/, pass it to yt-dlp
+		// This enables downloading age-restricted / login-required videos
+		$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
+		if (file_exists($cookieFile) && filesize($cookieFile) > 0) {
+			$confLines .= '--cookies "' . $cookieFile . '"' . "\n";
+		}
+
 		file_put_contents($tmpConf, $confLines);
 
 		$cmd  = $safeBin;
@@ -313,7 +321,12 @@ class ytdlp_universal extends DownloadClass {
 	 */
 	private function showFormatSelector($link, $safeBin, $safeUrl) {
 		// Query available formats with JSON output
-		$cmd = $safeBin . ' --dump-json --no-download --no-playlist ' . $safeUrl . ' 2>&1';
+		$cookieArg = '';
+		$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
+		if (file_exists($cookieFile) && filesize($cookieFile) > 0) {
+			$cookieArg = ' --cookies ' . escapeshellarg($cookieFile);
+		}
+		$cmd = $safeBin . ' --dump-json --no-download --no-playlist' . $cookieArg . ' ' . $safeUrl . ' 2>&1';
 		$output = array();
 		$ret = -1;
 		@exec($cmd, $output, $ret);
