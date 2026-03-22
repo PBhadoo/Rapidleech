@@ -211,7 +211,7 @@ input[type="submit"]:hover,input[type="button"]:hover,button:hover{transform:tra
 
 /* ---------- Alerts ---------- */
 .warning{color:var(--fl-warn);padding:12px 16px;background:rgba(245,158,11,.08);border-radius:var(--fl-r);border-left:4px solid var(--fl-warn)}
-.htmlerror{color:var(--fl-danger);background:rgba(239,68,68,.06);padding:16px;border-radius:var(--fl-r);border:1px solid var(--fl-danger);line-height:1.6}
+.htmlerror{color:var(--fl-danger);font-weight:500;line-height:1.6}
 .autodel{color:var(--fl-warn);font-weight:500;padding:8px 16px;background:rgba(245,158,11,.08);border-radius:var(--fl-r-full);display:inline-block;font-size:13px}
 
 /* ---------- Transfer UIs ---------- */
