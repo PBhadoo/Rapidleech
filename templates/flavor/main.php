@@ -139,7 +139,7 @@ if (!defined('RAPIDLEECH')) { require_once("index.html"); exit; }
                         <div style="border-top:1px solid var(--fl-border);padding-top:14px;">
                             <p style="color:var(--fl-accent);font-size:12px;font-weight:600;margin-bottom:10px;"><?php echo lang(214); ?></p>
                             <label class="rl-checkbox" style="margin-bottom:6px;"><input type="checkbox" name="dis_plug"><small><?php echo lang(215); ?></small></label>
-                            <label class="rl-checkbox"><input type="checkbox" name="cookieuse" onclick="javascript:var d=this.checked?'':'none';document.getElementById('cookieblock').style.display=d;"><small><?php echo lang(235); ?></small></label>
+                            <label class="rl-checkbox"><input type="checkbox" name="cookieuse" id="cookieuse_cb" onchange="document.getElementById('cookieblock').style.display=this.checked?'block':'none';"><small><?php echo lang(235); ?></small></label>
                             <div id="cookieblock" style="display:none;margin-top:10px;"><label class="fl-label"><?php echo lang(236); ?></label><input type="text" name="cookie" id="cookie" value=""></div>
                         </div>
                     </div>
