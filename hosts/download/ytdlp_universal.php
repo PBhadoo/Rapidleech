@@ -117,11 +117,36 @@ class ytdlp_universal extends DownloadClass {
 		$safeDir  = escapeshellarg($downloadDir);
 
 		// ── Step 3: Handle user-provided cookies ───────────────────────────
-		// If user pasted cookies in the form, save them for this session
+		$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
+
+		// Option A: User pasted full cookies.txt content (from yt-dlp format page)
 		if (!empty($_POST['ytdlp_user_cookies']) && trim($_POST['ytdlp_user_cookies']) !== '') {
-			$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
 			@file_put_contents($cookieFile, $_POST['ytdlp_user_cookies']);
 			@chmod($cookieFile, 0644);
+		}
+		// Option B: User entered cookies via main form "Additional Cookie Value" (Key=Value format)
+		elseif (!empty($_GET['cookieuse']) && $_GET['cookieuse'] === 'on' && !empty($_GET['cookie'])) {
+			$rawCookie = trim($_GET['cookie']);
+			if (!empty($rawCookie) && strpos($rawCookie, "\t") === false) {
+				// Convert Key=Value; Key2=Value2 format to Netscape cookies.txt format
+				// Detect the domain from the URL
+				$urlParts = parse_url($link);
+				$domain = !empty($urlParts['host']) ? $urlParts['host'] : '.youtube.com';
+				$netscapeCookies = "# Netscape HTTP Cookie File\n# Converted from Rapidleech cookie input\n";
+				$pairs = array_map('trim', explode(';', $rawCookie));
+				foreach ($pairs as $pair) {
+					if (strpos($pair, '=') !== false) {
+						list($name, $value) = explode('=', $pair, 2);
+						$name = trim($name);
+						$value = trim($value);
+						if ($name !== '') {
+							$netscapeCookies .= ".$domain\tTRUE\t/\tTRUE\t0\t$name\t$value\n";
+						}
+					}
+				}
+				@file_put_contents($cookieFile, $netscapeCookies);
+				@chmod($cookieFile, 0644);
+			}
 		}
 
 		// ── Step 3b (optional): Show format selector ───────────────────────
