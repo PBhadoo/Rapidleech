@@ -194,6 +194,11 @@ class ytdlp_universal extends DownloadClass {
 		$confLines .= "--merge-output-format mp4\n";
 		$confLines .= "--print after_move:filepath\n";
 
+		// Set cache dir to a writable location (avoids /var/www/.cache permission errors)
+		$cacheDir = ROOT_DIR . PATH_SPLITTER . 'files' . PATH_SPLITTER . '.ytdlp_cache';
+		if (!is_dir($cacheDir)) @mkdir($cacheDir, 0777, true);
+		$confLines .= '--cache-dir "' . $cacheDir . '"' . "\n";
+
 		// Cookie support: use per-user temp cookie file if available
 		if (!empty($userCookieFile) && file_exists($userCookieFile)) {
 			$confLines .= '--cookies "' . $userCookieFile . '"' . "\n";
