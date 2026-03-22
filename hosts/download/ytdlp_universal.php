@@ -116,7 +116,15 @@ class ytdlp_universal extends DownloadClass {
 		$safeBin  = escapeshellarg($bin);
 		$safeDir  = escapeshellarg($downloadDir);
 
-		// ── Step 3 (optional): Show format selector ────────────────────────
+		// ── Step 3: Handle user-provided cookies ───────────────────────────
+		// If user pasted cookies in the form, save them for this session
+		if (!empty($_POST['ytdlp_user_cookies']) && trim($_POST['ytdlp_user_cookies']) !== '') {
+			$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
+			@file_put_contents($cookieFile, $_POST['ytdlp_user_cookies']);
+			@chmod($cookieFile, 0644);
+		}
+
+		// ── Step 3b (optional): Show format selector ───────────────────────
 		if (empty($_POST['ytdlp_step'])) {
 			return $this->showFormatSelector($link, $safeBin, $safeUrl);
 		}
@@ -513,6 +521,30 @@ class ytdlp_universal extends DownloadClass {
 		}
 
 		echo '</form>';
+
+		// ── Cookie input for users (collapsible) ───────────────────────────
+		$existingCookies = '';
+		$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
+		if (file_exists($cookieFile)) $existingCookies = @file_get_contents($cookieFile) ?: '';
+
+		echo '<details style="margin-top:24px;border:1px solid #333;border-radius:10px;overflow:hidden;">';
+		echo '<summary style="padding:14px 18px;cursor:pointer;font-weight:600;">🍪 Login Required? Paste Browser Cookies</summary>';
+		echo '<div style="padding:18px;">';
+		echo '<p style="opacity:0.6;font-size:13px;margin-bottom:12px;">';
+		echo 'Some videos require authentication. Export cookies from your browser and paste below.<br/>';
+		echo '<b>How:</b> Install <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" style="color:#818cf8;">Get cookies.txt LOCALLY</a> extension → ';
+		echo 'Log into YouTube → Click extension icon → Export → Paste here.</p>';
+		echo '<form method="POST" action="' . htmlspecialchars($_SERVER['SCRIPT_NAME']) . '">';
+		$params2 = $this->DefaultParamArr($link);
+		foreach ($params2 as $k => $v) echo '<input type="hidden" name="' . htmlspecialchars($k) . '" value="' . htmlspecialchars($v) . '" />';
+		echo '<textarea name="ytdlp_user_cookies" rows="6" style="width:100%;font:12px/1.4 monospace;padding:10px;border-radius:8px;border:1px solid #444;background:rgba(0,0,0,.3);color:inherit;resize:vertical;" '
+			. 'placeholder="# Netscape HTTP Cookie File&#10;# Paste your cookies.txt content here...">'
+			. htmlspecialchars($existingCookies) . '</textarea>';
+		echo '<div style="margin-top:10px;display:flex;gap:8px;">';
+		echo '<button type="submit" style="padding:8px 18px;font-size:13px;">🍪 Save Cookies & Reload</button>';
+		echo '</div>';
+		echo '</form>';
+		echo '</div></details>';
 
 		echo '<div style="margin-top:20px;text-align:center;">';
 		echo '<a href="' . htmlspecialchars($_SERVER['SCRIPT_NAME']) . '">← Back to main page</a>';
