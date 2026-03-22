@@ -144,8 +144,23 @@ if (!defined('RAPIDLEECH')) { require_once("index.html"); exit; }
                                 <label class="fl-label"><?php echo lang(236); ?></label>
                                 <input type="text" name="cookie" id="cookie" value="" placeholder="key1=value1; key2=value2" style="margin-bottom:8px;">
                                 <label class="fl-label">🍪 Full cookies.txt (for YouTube / yt-dlp)</label>
-                                <textarea name="ytdlp_user_cookies" rows="4" style="font:11px/1.4 monospace;" placeholder="# Netscape HTTP Cookie File&#10;# Paste exported cookies.txt here for YouTube login-required videos&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;0&#9;cookie_name&#9;cookie_value"></textarea>
-                                <small style="color:var(--fl-text-3);font-size:11px;">Export from: <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" style="color:var(--fl-accent);">Get cookies.txt LOCALLY</a> extension</small>
+                                <textarea name="ytdlp_user_cookies" id="ytdlp_cookies_ta" rows="4" style="font:11px/1.4 monospace;" placeholder="# Netscape HTTP Cookie File&#10;# Paste exported cookies.txt here for YouTube login-required videos&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;0&#9;cookie_name&#9;cookie_value"></textarea>
+                                <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+                                    <small style="color:var(--fl-text-3);font-size:11px;">Export from: <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" style="color:var(--fl-accent);">Get cookies.txt LOCALLY</a></small>
+                                    <small id="ytdlp_cookies_status" style="color:var(--fl-success);font-size:11px;display:none;">✓ Saved</small>
+                                    <a href="javascript:void(0);" onclick="document.getElementById('ytdlp_cookies_ta').value='';localStorage.removeItem('rl_ytdlp_cookies');document.getElementById('ytdlp_cookies_status').style.display='none';" style="font-size:11px;color:var(--fl-danger);margin-left:auto;">Clear</a>
+                                </div>
+                                <script>
+                                (function(){
+                                    var ta=document.getElementById('ytdlp_cookies_ta');
+                                    var saved=localStorage.getItem('rl_ytdlp_cookies');
+                                    if(saved){ta.value=saved;document.getElementById('ytdlp_cookies_status').style.display='inline';document.getElementById('ytdlp_cookies_status').textContent='✓ Loaded from browser';}
+                                    ta.addEventListener('input',function(){
+                                        if(ta.value.trim()){localStorage.setItem('rl_ytdlp_cookies',ta.value);document.getElementById('ytdlp_cookies_status').style.display='inline';document.getElementById('ytdlp_cookies_status').textContent='✓ Saved';}
+                                        else{localStorage.removeItem('rl_ytdlp_cookies');document.getElementById('ytdlp_cookies_status').style.display='none';}
+                                    });
+                                })();
+                                </script>
                             </div>
                         </div>
                     </div>
