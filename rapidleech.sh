@@ -96,6 +96,16 @@ echo "Installing ffmpeg..."
 sudo apt install -y ffmpeg
 echo "ffmpeg version: $(ffmpeg -version 2>&1 | head -1)"
 
+# Install Deno (required by yt-dlp for YouTube JS challenge solving)
+echo "Installing Deno JavaScript runtime..."
+curl -fsSL https://deno.land/install.sh | sh
+# Make deno available system-wide
+if [ -f "$HOME/.deno/bin/deno" ]; then
+    sudo cp "$HOME/.deno/bin/deno" /usr/local/bin/deno
+    sudo chmod a+rx /usr/local/bin/deno
+    echo "Deno version: $(deno --version | head -1)"
+fi
+
 sudo chown -R www-data:www-data /var/www/html
 
 echo ""

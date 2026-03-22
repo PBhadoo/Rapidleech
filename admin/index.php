@@ -206,6 +206,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'success';
             break;
 
+        case 'install_deno':
+            $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+            if ($isWindows) {
+                $message = 'Deno auto-install is only supported on Linux. Install manually from https://deno.land';
+                $messageType = 'error';
+            } else {
+                $canSudo = (trim(@shell_exec('sudo -n true 2>&1; echo $?')) === '0');
+                if ($canSudo) {
+                    $cmd = "curl -fsSL https://deno.land/install.sh | sh 2>&1 && sudo cp \$HOME/.deno/bin/deno /usr/local/bin/deno 2>&1 && sudo chmod a+rx /usr/local/bin/deno && echo 'Deno installed:' && deno --version 2>&1";
+                } else {
+                    $cmd = "curl -fsSL https://deno.land/install.sh | sh 2>&1 && echo 'Deno installed:' && \$HOME/.deno/bin/deno --version 2>&1";
+                }
+                $output = shell_exec($cmd);
+                $denoVer = trim(@shell_exec('deno --version 2>&1 | head -1'));
+                if (strpos($denoVer, 'deno') !== false) {
+                    rl_log_admin('Install Deno', $denoVer);
+                    $message = "Deno installed successfully: $denoVer";
+                    $messageType = 'success';
+                } else {
+                    $message = "Deno installation may have failed. Check output below.";
+                    $messageType = 'error';
+                }
+            }
+            break;
+
         case 'save_ytdlp_cookies':
             $cookies = $_POST['ytdlp_cookies_content'] ?? '';
             $cookiePath = $rootDir . '/configs/ytdlp_cookies.txt';
@@ -485,6 +510,29 @@ label.check input{accent-color:#6366f1}
         <?php if (isset($output) && ($_POST['action'] ?? '') === 'update_ytdlp'): ?>
         <div class="output"><?php echo htmlspecialchars($output); ?></div>
         <?php endif; ?>
+
+        <!-- Deno Runtime (required for YouTube) -->
+        <?php $denoVer = trim(@shell_exec('deno --version 2>&1 | head -1')); $hasDeno = (strpos($denoVer, 'deno') !== false); ?>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid #282d3e">
+            <div class="flex" style="margin-bottom:10px;align-items:center;gap:12px">
+                <span style="color:#606880;font-size:13px">⚡ Deno JS Runtime:</span>
+                <span class="tag <?php echo $hasDeno ? 'tag-green' : 'tag-red'; ?>"><?php echo $hasDeno ? htmlspecialchars($denoVer) : 'Not installed'; ?></span>
+                <?php if (!$hasDeno): ?>
+                <span style="color:#ef4444;font-size:12px">⚠️ Required for YouTube downloads</span>
+                <?php endif; ?>
+            </div>
+            <?php if (!$hasDeno): ?>
+            <form method="POST" onsubmit="return confirm('This will install Deno JavaScript runtime from deno.land');" style="display:inline">
+                <input type="hidden" name="action" value="install_deno">
+                <button type="submit" class="btn btn-warning" style="font-size:13px;padding:8px 16px">⚡ Install Deno</button>
+            </form>
+            <?php endif; ?>
+            <?php if (isset($output) && ($_POST['action'] ?? '') === 'install_deno'): ?>
+            <div class="output"><?php echo htmlspecialchars($output); ?></div>
+            <?php endif; ?>
+            <p style="color:#606880;font-size:11px;margin-top:8px">yt-dlp requires Deno to solve YouTube's JavaScript challenges. Without it, only limited formats may be available.</p>
+        </div>
+
         <script>
         fetch('?check_ytdlp=1').then(r=>r.text()).then(v=>{
             if(v&&v!=='error'){document.querySelector('#ytdlp-latest .tag').textContent=v;document.querySelector('#ytdlp-latest .tag').className='tag tag-green';}
