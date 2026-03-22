@@ -26,6 +26,42 @@ $filesDir = $rootDir . '/files';
 $accountsFile = $configDir . '/accounts.php';
 $configFile = $configDir . '/config.php';
 
+// Helper: Get installed yt-dlp version
+function getInstalledYtdlpVersion() {
+    $paths = array('/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp');
+    // Also check project root
+    $rootDir = dirname(__DIR__);
+    $paths[] = $rootDir . '/yt-dlp.exe';
+    $paths[] = $rootDir . '/yt-dlp';
+    
+    foreach ($paths as $p) {
+        if (file_exists($p)) {
+            $out = @shell_exec(escapeshellarg($p) . ' --version 2>&1');
+            if ($out && preg_match('/^\d{4}\.\d{2}\.\d{2}/', trim($out))) {
+                return array('version' => trim($out), 'path' => $p);
+            }
+        }
+    }
+    // Try just 'yt-dlp' in PATH
+    $out = @shell_exec('yt-dlp --version 2>&1');
+    if ($out && preg_match('/^\d{4}\.\d{2}\.\d{2}/', trim($out))) {
+        return array('version' => trim($out), 'path' => 'yt-dlp (PATH)');
+    }
+    return array('version' => 'Not installed', 'path' => '');
+}
+
+// Helper: Get latest yt-dlp version from GitHub
+function getLatestYtdlpVersion() {
+    $ctx = stream_context_create(['http' => ['timeout' => 10, 'user_agent' => 'Mozilla/5.0', 'follow_location' => 0]]);
+    // GitHub API for latest release
+    $json = @file_get_contents('https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest', false, $ctx);
+    if ($json) {
+        $data = @json_decode($json, true);
+        if (!empty($data['tag_name'])) return $data['tag_name'];
+    }
+    return false;
+}
+
 // Helper: Get installed RAR version
 function getInstalledRarVersion($rootDir) {
     $rarExec = $rootDir . '/rar/rar';
@@ -59,6 +95,14 @@ function getLatestRarVersion() {
 if (isset($_GET['check_rar'])) {
     header('Content-Type: text/plain');
     $ver = getLatestRarVersion();
+    echo $ver ? $ver : 'error';
+    exit;
+}
+
+// AJAX endpoint: check latest yt-dlp version
+if (isset($_GET['check_ytdlp'])) {
+    header('Content-Type: text/plain');
+    $ver = getLatestYtdlpVersion();
     echo $ver ? $ver : 'error';
     exit;
 }
@@ -160,6 +204,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $resetType = $fullReset ? 'Full reset (configs overwritten)' : 'Configs preserved';
             $message = "Git update completed. $resetType.";
             $messageType = 'success';
+            break;
+
+        case 'update_ytdlp':
+            $ytdlpInfo = getInstalledYtdlpVersion();
+            $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+            if ($isWindows) {
+                $binPath = $rootDir . DIRECTORY_SEPARATOR . 'yt-dlp.exe';
+                $downloadUrl = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
+                $cmd = "echo Downloading yt-dlp.exe... && curl -L -o " . escapeshellarg($binPath) . " " . escapeshellarg($downloadUrl) . " 2>&1 && echo Done.";
+            } else {
+                $binPath = '/usr/local/bin/yt-dlp';
+                $downloadUrl = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
+                $cmd = "echo 'Downloading yt-dlp...' && sudo curl -L '$downloadUrl' -o '$binPath' 2>&1 && sudo chmod a+rx '$binPath' && echo 'Installed:' && $binPath --version 2>&1";
+            }
+            $output = shell_exec($cmd);
+            $newInfo = getInstalledYtdlpVersion();
+            if ($newInfo['version'] === 'Not installed') {
+                $message = "yt-dlp update may have failed. Check output below.";
+                $messageType = 'error';
+            } else {
+                rl_log_admin('Update yt-dlp', 'Updated to ' . $newInfo['version']);
+                $message = "yt-dlp updated to version " . $newInfo['version'] . ".";
+                $messageType = 'success';
+            }
             break;
 
         case 'update_rar':
@@ -354,6 +422,42 @@ label.check input{accent-color:#6366f1}
             if(v&&v!=='error'){document.querySelector('#rar-latest .tag').textContent=v;document.querySelector('#rar-latest .tag').className='tag tag-green';}
             else{document.querySelector('#rar-latest .tag').textContent='Could not check';document.querySelector('#rar-latest .tag').className='tag tag-yellow';}
         }).catch(()=>{document.querySelector('#rar-latest .tag').textContent='Error';document.querySelector('#rar-latest .tag').className='tag tag-red';});
+        </script>
+    </div>
+
+    <!-- yt-dlp Update -->
+    <?php $ytdlpInfo = getInstalledYtdlpVersion(); ?>
+    <div class="card">
+        <h2>📹 yt-dlp (Video Downloader)</h2>
+        <h3>Download videos from YouTube, Vimeo, TikTok, Twitter/X, Instagram, and 1000+ sites</h3>
+        <div class="flex" style="margin-bottom:12px;align-items:center;gap:16px">
+            <div>
+                <span style="color:#606880;font-size:13px">Installed:</span>
+                <span class="tag <?php echo ($ytdlpInfo['version'] === 'Not installed') ? 'tag-red' : 'tag-green'; ?>"><?php echo htmlspecialchars($ytdlpInfo['version']); ?></span>
+            </div>
+            <div id="ytdlp-latest">
+                <span style="color:#606880;font-size:13px">Latest:</span>
+                <span class="tag tag-yellow">Checking...</span>
+            </div>
+            <?php if ($ytdlpInfo['path']): ?>
+            <div>
+                <span style="color:#606880;font-size:13px">Path:</span>
+                <span style="color:#a0a8c0;font-size:12px;font-family:monospace"><?php echo htmlspecialchars($ytdlpInfo['path']); ?></span>
+            </div>
+            <?php endif; ?>
+        </div>
+        <form method="POST" onsubmit="return confirm('This will download the latest yt-dlp binary from GitHub.');">
+            <input type="hidden" name="action" value="update_ytdlp">
+            <button type="submit" class="btn btn-primary">📹 <?php echo ($ytdlpInfo['version'] === 'Not installed') ? 'Install' : 'Update'; ?> yt-dlp</button>
+        </form>
+        <?php if (isset($output) && ($_POST['action'] ?? '') === 'update_ytdlp'): ?>
+        <div class="output"><?php echo htmlspecialchars($output); ?></div>
+        <?php endif; ?>
+        <script>
+        fetch('?check_ytdlp=1').then(r=>r.text()).then(v=>{
+            if(v&&v!=='error'){document.querySelector('#ytdlp-latest .tag').textContent=v;document.querySelector('#ytdlp-latest .tag').className='tag tag-green';}
+            else{document.querySelector('#ytdlp-latest .tag').textContent='Could not check';document.querySelector('#ytdlp-latest .tag').className='tag tag-yellow';}
+        }).catch(()=>{document.querySelector('#ytdlp-latest .tag').textContent='Error';document.querySelector('#ytdlp-latest .tag').className='tag tag-red';});
         </script>
     </div>
 

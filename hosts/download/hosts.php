@@ -47,6 +47,57 @@ while (false !== ($entry = $d->read())) {
 			case 'pornhub.com':
 				foreach(array('pornhub.org', 'pornhubpremium.com', 'pornhubpremium.org') as $phdomain) $host["$phdomain"] = $host['pornhub.com'];
 				break;
+			// yt-dlp universal plugin: maps many video/media domains to the single ytdlp_universal.php plugin
+			case 'ytdlp.universal':
+				$ytdlp_domains = array(
+					// YouTube (overrides broken built-in plugin with yt-dlp)
+					'youtube.com', 'www.youtube.com', 'youtu.be', 'm.youtube.com',
+					// Video platforms
+					'vimeo.com', 'player.vimeo.com',
+					'twitch.tv', 'clips.twitch.tv',
+					'tiktok.com', 'www.tiktok.com', 'vm.tiktok.com',
+					'instagram.com', 'www.instagram.com',
+					'twitter.com', 'x.com', 'mobile.twitter.com',
+					'reddit.com', 'www.reddit.com', 'old.reddit.com', 'v.redd.it',
+					'streamable.com',
+					'bitchute.com', 'www.bitchute.com',
+					'rumble.com',
+					'odysee.com',
+					'bilibili.com', 'www.bilibili.com', 'b23.tv',
+					'nicovideo.jp', 'www.nicovideo.jp',
+					'crunchyroll.com', 'www.crunchyroll.com',
+					// Music platforms
+					'soundcloud.com', 'www.soundcloud.com', 'm.soundcloud.com',
+					'bandcamp.com',
+					'mixcloud.com', 'www.mixcloud.com',
+					// Media / news
+					'cnn.com', 'edition.cnn.com',
+					'bbc.co.uk', 'www.bbc.co.uk', 'bbc.com', 'www.bbc.com',
+					'cbsnews.com', 'www.cbsnews.com',
+					'washingtonpost.com', 'www.washingtonpost.com',
+					'nytimes.com', 'www.nytimes.com',
+					'theguardian.com', 'www.theguardian.com',
+					// Education / tech
+					'ted.com', 'www.ted.com',
+					'udemy.com', 'www.udemy.com',
+					'coursera.org', 'www.coursera.org',
+					// Other popular sites
+					'archive.org',
+					'lbry.tv',
+					'vidio.com',
+					'veoh.com', 'www.veoh.com',
+					'metacafe.com', 'www.metacafe.com',
+					'coub.com',
+					'9gag.com',
+					'vlive.tv', 'www.vlive.tv',
+					'videa.hu',
+					'peertube.social',
+					'hooktube.com',
+					'invidio.us', 'invidious.snopyta.org',
+					'piped.kavin.rocks',
+				);
+				foreach ($ytdlp_domains as $ytd) $host[$ytd] = 'ytdlp_universal.php';
+				break;
 		}
 	}
 }

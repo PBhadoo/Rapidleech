@@ -84,6 +84,18 @@ sudo tar -xf rarlinux-x64-720.tar.gz
 sudo rm -f rarlinux-x64-720.tar.gz
 sudo chmod -R 777 rar
 sudo chmod +x rar/rar rar/unrar 2>/dev/null
+
+# Install yt-dlp (for video downloads from YouTube, Vimeo, TikTok, etc.)
+echo "Installing yt-dlp..."
+sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+sudo chmod a+rx /usr/local/bin/yt-dlp
+echo "yt-dlp version: $(yt-dlp --version)"
+
+# Install ffmpeg (recommended for yt-dlp video+audio merging)
+echo "Installing ffmpeg..."
+sudo apt install -y ffmpeg
+echo "ffmpeg version: $(ffmpeg -version 2>&1 | head -1)"
+
 sudo chown -R www-data:www-data /var/www/html
 
 echo ""

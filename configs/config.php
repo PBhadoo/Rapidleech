@@ -80,6 +80,11 @@ $options = array (
   'parallel_chunks' => 8,
   'admin_user' => 'admin',
   'admin_pass' => 'admin',
+  // yt-dlp plugin: path to the yt-dlp binary
+  // Linux default: '/usr/local/bin/yt-dlp'
+  // Windows default: auto-detects yt-dlp.exe in project root or PATH
+  // Set to false or remove to use auto-detection
+  'ytdlp_binary' => false,
 ); 
 
 require_once('site_checker.php');

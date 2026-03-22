@@ -20,6 +20,8 @@ This installs PHP 8.3, Apache2, all required extensions, and optionally sets up 
 | **PHP** | 8.3+ (8.1+ minimum) |
 | **Web Server** | Apache2 with mod_rewrite |
 | **PHP Extensions** | curl, openssl, mbstring, bcmath, gd, xml, zip, intl |
+| **yt-dlp** | Auto-installed by installer script. For video downloads from YouTube, Vimeo, TikTok, etc. |
+| **ffmpeg** | Auto-installed by installer script. Required for yt-dlp video+audio merging |
 
 > **Important:** `php-bcmath` is required for Mega.nz premium account login (RSA key decryption). Without it, Mega downloads fall back to anonymous mode with strict quota limits.
 
@@ -51,6 +53,7 @@ Features: Server status, clear all files, edit premium accounts, one-click GitHu
 #### Features
 
 - 🎨 **Two Templates** — "Flavor" (modern dark/light) and "PlugMod" (classic)
+- 📹 **yt-dlp Integration** — Download from YouTube, Vimeo, TikTok, Twitter/X, Instagram, Reddit, SoundCloud, and 1000+ more sites with quality selector
 - 🔌 **60 Active Plugins** — Mega.nz, Google Drive, MediaFire, Rapidgator, and more
 - 🔐 **File Ownership** — Cookie-based isolation, users only see their own files
 - 📊 **Download Tracking** — Real-time progress, pending downloads tab
