@@ -116,23 +116,22 @@ class ytdlp_universal extends DownloadClass {
 		$safeBin  = escapeshellarg($bin);
 		$safeDir  = escapeshellarg($downloadDir);
 
-		// ── Step 3: Handle user-provided cookies ───────────────────────────
-		$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
+		// ── Step 3: Handle user-provided cookies (per-user, per-session) ───
+		// Cookies are NOT saved to a shared server file. Each user's cookies
+		// are written to a temp file that is deleted after the download.
+		$userCookieContent = '';
 
-		// Option A: User pasted full cookies.txt content (from yt-dlp format page)
+		// Option A: User pasted full cookies.txt content (from form textarea)
 		if (!empty($_POST['ytdlp_user_cookies']) && trim($_POST['ytdlp_user_cookies']) !== '') {
-			@file_put_contents($cookieFile, $_POST['ytdlp_user_cookies']);
-			@chmod($cookieFile, 0644);
+			$userCookieContent = $_POST['ytdlp_user_cookies'];
 		}
 		// Option B: User entered cookies via main form "Additional Cookie Value" (Key=Value format)
 		elseif (!empty($_GET['cookieuse']) && $_GET['cookieuse'] === 'on' && !empty($_GET['cookie'])) {
 			$rawCookie = trim($_GET['cookie']);
 			if (!empty($rawCookie) && strpos($rawCookie, "\t") === false) {
-				// Convert Key=Value; Key2=Value2 format to Netscape cookies.txt format
-				// Detect the domain from the URL
 				$urlParts = parse_url($link);
 				$domain = !empty($urlParts['host']) ? $urlParts['host'] : '.youtube.com';
-				$netscapeCookies = "# Netscape HTTP Cookie File\n# Converted from Rapidleech cookie input\n";
+				$userCookieContent = "# Netscape HTTP Cookie File\n";
 				$pairs = array_map('trim', explode(';', $rawCookie));
 				foreach ($pairs as $pair) {
 					if (strpos($pair, '=') !== false) {
@@ -140,17 +139,31 @@ class ytdlp_universal extends DownloadClass {
 						$name = trim($name);
 						$value = trim($value);
 						if ($name !== '') {
-							$netscapeCookies .= ".$domain\tTRUE\t/\tTRUE\t0\t$name\t$value\n";
+							$userCookieContent .= ".$domain\tTRUE\t/\tTRUE\t0\t$name\t$value\n";
 						}
 					}
 				}
-				@file_put_contents($cookieFile, $netscapeCookies);
-				@chmod($cookieFile, 0644);
 			}
 		}
+		// Option C: Fall back to admin-configured cookies file
+		$adminCookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
+		if (empty($userCookieContent) && file_exists($adminCookieFile) && filesize($adminCookieFile) > 0) {
+			$userCookieContent = file_get_contents($adminCookieFile);
+		}
+
+		// Write to a per-user temp file (deleted after download)
+		$userCookieFile = '';
+		if (!empty($userCookieContent)) {
+			$userCookieFile = tempnam(sys_get_temp_dir(), 'ytdlp_ck_');
+			file_put_contents($userCookieFile, $userCookieContent);
+		}
+
+		// Store for use by showFormatSelector
+		$this->_userCookieContent = $userCookieContent;
 
 		// ── Step 3b (optional): Show format selector ───────────────────────
 		if (empty($_POST['ytdlp_step'])) {
+			if (!empty($userCookieFile)) @unlink($userCookieFile); // clean up before redirect
 			return $this->showFormatSelector($link, $safeBin, $safeUrl);
 		}
 
@@ -181,11 +194,9 @@ class ytdlp_universal extends DownloadClass {
 		$confLines .= "--merge-output-format mp4\n";
 		$confLines .= "--print after_move:filepath\n";
 
-		// Cookie support: if a cookies.txt file exists in configs/, pass it to yt-dlp
-		// This enables downloading age-restricted / login-required videos
-		$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
-		if (file_exists($cookieFile) && filesize($cookieFile) > 0) {
-			$confLines .= '--cookies "' . $cookieFile . '"' . "\n";
+		// Cookie support: use per-user temp cookie file if available
+		if (!empty($userCookieFile) && file_exists($userCookieFile)) {
+			$confLines .= '--cookies "' . $userCookieFile . '"' . "\n";
 		}
 
 		file_put_contents($tmpConf, $confLines);
@@ -293,8 +304,9 @@ class ytdlp_universal extends DownloadClass {
 		if (function_exists('ob_flush')) @ob_flush();
 		@flush();
 
-		// Clean up temp config file
+		// Clean up temp files
 		@unlink($tmpConf);
+		if (!empty($userCookieFile)) @unlink($userCookieFile);
 
 		$allOutput = implode("\n", $output);
 
@@ -440,16 +452,25 @@ class ytdlp_universal extends DownloadClass {
 	 * Query available formats and show a selection UI.
 	 */
 	private function showFormatSelector($link, $safeBin, $safeUrl) {
-		// Query available formats with JSON output
+		// Use per-user temp cookie file for format listing too
 		$cookieArg = '';
-		$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
-		if (file_exists($cookieFile) && filesize($cookieFile) > 0) {
-			$cookieArg = ' --cookies ' . escapeshellarg($cookieFile);
+		$fmtCookieFile = '';
+		if (!empty($this->_userCookieContent)) {
+			$fmtCookieFile = tempnam(sys_get_temp_dir(), 'ytdlp_fck_');
+			file_put_contents($fmtCookieFile, $this->_userCookieContent);
+			$cookieArg = ' --cookies ' . escapeshellarg($fmtCookieFile);
+		} else {
+			// Fall back to admin cookie file
+			$adminCF = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
+			if (file_exists($adminCF) && filesize($adminCF) > 0) {
+				$cookieArg = ' --cookies ' . escapeshellarg($adminCF);
+			}
 		}
 		$cmd = $safeBin . ' --dump-json --no-download --no-playlist' . $cookieArg . ' ' . $safeUrl . ' 2>&1';
 		$output = array();
 		$ret = -1;
 		@exec($cmd, $output, $ret);
+		if ($fmtCookieFile) @unlink($fmtCookieFile); // clean up temp cookie
 		$allOutput = implode("\n", $output);
 
 		// Try to parse JSON (may have warning lines before it)
