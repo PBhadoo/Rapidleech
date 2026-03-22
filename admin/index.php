@@ -214,9 +214,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $downloadUrl = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
                 $cmd = "echo Downloading yt-dlp.exe... && curl -L -o " . escapeshellarg($binPath) . " " . escapeshellarg($downloadUrl) . " 2>&1 && echo Done.";
             } else {
-                $binPath = '/usr/local/bin/yt-dlp';
+                // Try /usr/local/bin first (if writable or sudo works without password), else fall back to project root
+                $systemPath = '/usr/local/bin/yt-dlp';
+                $localPath = $rootDir . '/yt-dlp';
                 $downloadUrl = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
-                $cmd = "echo 'Downloading yt-dlp...' && sudo curl -L '$downloadUrl' -o '$binPath' 2>&1 && sudo chmod a+rx '$binPath' && echo 'Installed:' && $binPath --version 2>&1";
+                // Test if we can write to /usr/local/bin (sudo NOPASSWD or running as root)
+                $canSudo = (trim(@shell_exec('sudo -n true 2>&1; echo $?')) === '0');
+                if ($canSudo) {
+                    $binPath = $systemPath;
+                    $cmd = "echo 'Downloading yt-dlp to $binPath...' && sudo curl -L '$downloadUrl' -o '$binPath' 2>&1 && sudo chmod a+rx '$binPath' && echo 'Installed:' && $binPath --version 2>&1";
+                } else {
+                    $binPath = $localPath;
+                    $cmd = "echo 'Downloading yt-dlp to $binPath (no sudo)...' && curl -L '$downloadUrl' -o '$binPath' 2>&1 && chmod +x '$binPath' && echo 'Installed:' && $binPath --version 2>&1";
+                }
             }
             $output = shell_exec($cmd);
             $newInfo = getInstalledYtdlpVersion();
