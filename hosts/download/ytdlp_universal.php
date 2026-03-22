@@ -34,14 +34,18 @@ class ytdlp_universal extends DownloadClass {
 		if (!empty($options['ytdlp_binary'])) {
 			return $options['ytdlp_binary'];
 		}
-		// Sensible defaults per OS
-		if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-			// Windows: look next to Rapidleech root, then in PATH
-			$winPath = ROOT_DIR . PATH_SPLITTER . 'yt-dlp.exe';
-			if (file_exists($winPath)) return $winPath;
-			return 'yt-dlp.exe'; // hope it's in PATH
+		// Check project root first (works on all OS, no sudo needed)
+		$localBin = ROOT_DIR . PATH_SPLITTER . (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'yt-dlp.exe' : 'yt-dlp');
+		if (file_exists($localBin)) return $localBin;
+
+		// Then check common system paths (Linux)
+		if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+			foreach (array('/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp') as $sysPath) {
+				if (file_exists($sysPath)) return $sysPath;
+			}
 		}
-		return '/usr/local/bin/yt-dlp';
+		// Fallback: hope it's in PATH
+		return (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') ? 'yt-dlp.exe' : 'yt-dlp';
 	}
 
 	/**
