@@ -140,7 +140,13 @@ if (!defined('RAPIDLEECH')) { require_once("index.html"); exit; }
                             <p style="color:var(--fl-accent);font-size:12px;font-weight:600;margin-bottom:10px;"><?php echo lang(214); ?></p>
                             <label class="rl-checkbox" style="margin-bottom:6px;"><input type="checkbox" name="dis_plug"><small><?php echo lang(215); ?></small></label>
                             <label class="rl-checkbox"><input type="checkbox" name="cookieuse" id="cookieuse_cb" onchange="document.getElementById('cookieblock').style.display=this.checked?'block':'none';"><small><?php echo lang(235); ?></small></label>
-                            <div id="cookieblock" style="display:none;margin-top:10px;"><label class="fl-label"><?php echo lang(236); ?></label><input type="text" name="cookie" id="cookie" value=""></div>
+                            <div id="cookieblock" style="display:none;margin-top:10px;">
+                                <label class="fl-label"><?php echo lang(236); ?></label>
+                                <input type="text" name="cookie" id="cookie" value="" placeholder="key1=value1; key2=value2" style="margin-bottom:8px;">
+                                <label class="fl-label">🍪 Full cookies.txt (for YouTube / yt-dlp)</label>
+                                <textarea name="ytdlp_user_cookies" rows="4" style="font:11px/1.4 monospace;" placeholder="# Netscape HTTP Cookie File&#10;# Paste exported cookies.txt here for YouTube login-required videos&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;0&#9;cookie_name&#9;cookie_value"></textarea>
+                                <small style="color:var(--fl-text-3);font-size:11px;">Export from: <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" style="color:var(--fl-accent);">Get cookies.txt LOCALLY</a> extension</small>
+                            </div>
                         </div>
                     </div>
                 </div>
