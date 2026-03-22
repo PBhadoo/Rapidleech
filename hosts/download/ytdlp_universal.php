@@ -199,12 +199,99 @@ class ytdlp_universal extends DownloadClass {
 
 		$this->changeMesg('<br/>Downloading via yt-dlp…');
 
-		// ── Step 5: Execute ────────────────────────────────────────────────
+		// ── Step 5: Execute with real-time progress ────────────────────────
+		echo '<div id="ytdlp-progress" style="max-width:800px;margin:16px auto;padding:16px;background:#1e2231;border-radius:10px;border:1px solid #282d3e;">';
+		echo '<div style="font-weight:600;margin-bottom:8px;">📥 yt-dlp Progress</div>';
+		echo '<pre id="ytdlp-log" style="max-height:300px;overflow:auto;font:12px/1.5 monospace;color:#a0a8c0;margin:0;white-space:pre-wrap;word-break:break-all;">';
+		if (function_exists('ob_flush')) @ob_flush();
+		@flush();
+
 		$output = array();
 		$returnCode = -1;
 		$startTime = microtime(true);
-		@exec($cmd, $output, $returnCode);
+
+		$descriptors = array(
+			0 => array('pipe', 'r'),  // stdin
+			1 => array('pipe', 'w'),  // stdout
+			2 => array('pipe', 'w'),  // stderr
+		);
+		$process = @proc_open($cmd, $descriptors, $pipes);
+
+		if (is_resource($process)) {
+			fclose($pipes[0]); // close stdin
+			// Set non-blocking
+			stream_set_blocking($pipes[1], false);
+			stream_set_blocking($pipes[2], false);
+
+			$lastProgress = '';
+			while (true) {
+				$stdout = @fgets($pipes[1]);
+				$stderr = @fgets($pipes[2]);
+
+				if ($stdout !== false && $stdout !== '') {
+					$line = rtrim($stdout);
+					$output[] = $line;
+					// Show progress lines in real-time
+					if (preg_match('/\[download\]\s+(\d+\.?\d*%)/', $line, $pm)) {
+						// Progress percentage — update inline
+						$pct = $pm[1];
+						if ($pct !== $lastProgress) {
+							echo '<script>document.getElementById("ytdlp-pct").textContent="' . $pct . '";</script>';
+							$lastProgress = $pct;
+						}
+					} else {
+						echo htmlspecialchars($line) . "\n";
+					}
+					if (function_exists('ob_flush')) @ob_flush();
+					@flush();
+				}
+				if ($stderr !== false && $stderr !== '') {
+					$line = rtrim($stderr);
+					$output[] = $line;
+					echo '<span style="color:#f59e0b;">' . htmlspecialchars($line) . '</span>' . "\n";
+					if (function_exists('ob_flush')) @ob_flush();
+					@flush();
+				}
+
+				// Check if process ended
+				$status = proc_get_status($process);
+				if (!$status['running']) {
+					// Read remaining output
+					while (($line = @fgets($pipes[1])) !== false) { $output[] = rtrim($line); echo htmlspecialchars(rtrim($line)) . "\n"; }
+					while (($line = @fgets($pipes[2])) !== false) { $output[] = rtrim($line); echo '<span style="color:#f59e0b;">' . htmlspecialchars(rtrim($line)) . '</span>' . "\n"; }
+					$returnCode = $status['exitcode'];
+					break;
+				}
+				usleep(50000); // 50ms poll
+			}
+			fclose($pipes[1]);
+			fclose($pipes[2]);
+			proc_close($process);
+		} else {
+			// Fallback to exec if proc_open fails
+			@exec($cmd, $output, $returnCode);
+			echo htmlspecialchars(implode("\n", $output));
+		}
+
 		$elapsed = microtime(true) - $startTime;
+
+		echo '</pre>';
+		echo '<div id="ytdlp-pbar" style="margin-top:8px;height:6px;background:#282d3e;border-radius:3px;overflow:hidden;"><div id="ytdlp-pbar-fill" style="height:100%;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:3px;width:0;transition:width .3s;"></div></div>';
+		echo '<div style="margin-top:6px;font-size:12px;color:#606880;">Progress: <span id="ytdlp-pct">-</span></div>';
+		echo '</div>';
+		echo '<script>
+		(function(){
+			var log=document.getElementById("ytdlp-log");
+			if(log)log.scrollTop=log.scrollHeight;
+			var pct=document.getElementById("ytdlp-pct");
+			if(pct&&pct.textContent!=="-"){
+				var fill=document.getElementById("ytdlp-pbar-fill");
+				if(fill)fill.style.width=pct.textContent;
+			}
+		})();
+		</script>';
+		if (function_exists('ob_flush')) @ob_flush();
+		@flush();
 
 		// Clean up temp config file
 		@unlink($tmpConf);
