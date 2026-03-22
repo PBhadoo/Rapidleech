@@ -58,11 +58,26 @@ The built-in yt-dlp plugin supports downloading from **1000+ websites** includin
 - Per-user cookies (each user uses their own YouTube login, stored in browser localStorage)
 - Admin panel: one-click update yt-dlp, install Deno, manage cookies
 
-**Cookie Authentication:**
-Users can paste browser cookies for login-required videos in 3 ways:
-1. Main form → "Additional Cookie Value" checkbox → cookies.txt textarea (auto-saved in localStorage)
-2. Format selector page → "🍪 Login Required?" collapsible section
-3. Admin panel → yt-dlp card → Browser Cookies section (global fallback)
+**Cookie Authentication for YouTube:**
+
+YouTube often requires login to download videos (bot protection). Users need to provide browser cookies:
+
+**How to get cookies:**
+1. Install the **[Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)** browser extension (Chrome/Edge)
+2. Log into [YouTube](https://www.youtube.com) in your browser
+3. Click the extension icon on youtube.com → Click **Export**
+4. A `cookies.txt` file downloads — this contains your YouTube session
+
+**Where to paste cookies (3 options):**
+1. **Main form** → Check "Additional Cookie Value" → Paste into the **cookies.txt textarea** → Click Transload (cookies are saved in your browser's localStorage and auto-loaded every visit)
+2. **Format selector page** → Expand "🍪 Login Required?" → Paste cookies → Click "Save Cookies & Reload"
+3. **Admin panel** → yt-dlp card → Browser Cookies section (sets global fallback for all users)
+
+> **Note:** Cookies are per-user — each user's cookies are written to a temporary file that is deleted after the download. They are never shared between users. YouTube cookies expire periodically, so re-export if downloads start failing.
+
+**Server requirements for YouTube:**
+- **Deno** JavaScript runtime — required by yt-dlp to solve YouTube's bot challenges. Install via Admin Panel → yt-dlp card → "⚡ Install Deno" button, or: `curl -fsSL https://deno.land/install.sh | sh && sudo cp ~/.deno/bin/deno /usr/local/bin/deno`
+- **ffmpeg** — required to merge separate video+audio streams into MP4. Install via: `sudo apt install ffmpeg`
 
 #### PHP Extensions Install (if missing)
 
