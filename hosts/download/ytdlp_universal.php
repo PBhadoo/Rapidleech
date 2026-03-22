@@ -586,6 +586,10 @@ class ytdlp_universal extends DownloadClass {
 		$params = $this->DefaultParamArr($link);
 		foreach ($params as $k => $v) echo '<input type="hidden" name="' . htmlspecialchars($k) . '" value="' . htmlspecialchars($v) . '" />';
 		echo '<input type="hidden" name="ytdlp_step" value="1" />';
+		// Carry user cookies through to the download step
+		if (!empty($this->_userCookieContent)) {
+			echo '<input type="hidden" name="ytdlp_user_cookies" value="' . htmlspecialchars($this->_userCookieContent) . '" />';
+		}
 
 		// ── Best Quality (recommended) ─────────────────────────────────────
 		echo '<div style="margin-bottom:24px;">';
