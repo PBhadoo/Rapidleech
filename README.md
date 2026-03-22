@@ -1,4 +1,4 @@
-### RapidLeech v2.0.1
+### RapidLeech v2.0.2
 
 Build and Edited from https://github.com/Th3-822/rapidleech
 
@@ -10,7 +10,7 @@ Build and Edited from https://github.com/Th3-822/rapidleech
 bash <(curl -s https://raw.githubusercontent.com/PBhadoo/Rapidleech/main/rapidleech.sh)
 ```
 
-This installs PHP 8.3, Apache2, all required extensions, and optionally sets up SSL.
+This installs PHP 8.3, Apache2, yt-dlp, ffmpeg, Deno, and all required extensions. Optionally sets up SSL.
 
 #### Requirements
 
@@ -20,16 +20,54 @@ This installs PHP 8.3, Apache2, all required extensions, and optionally sets up 
 | **PHP** | 8.3+ (8.1+ minimum) |
 | **Web Server** | Apache2 with mod_rewrite |
 | **PHP Extensions** | curl, openssl, mbstring, bcmath, gd, xml, zip, intl |
-| **yt-dlp** | Auto-installed by installer script. For video downloads from YouTube, Vimeo, TikTok, etc. |
-| **ffmpeg** | Auto-installed by installer script. Required for yt-dlp video+audio merging |
+| **yt-dlp** | Auto-installed. Video downloads from YouTube, Vimeo, TikTok, 1000+ sites |
+| **ffmpeg** | Auto-installed. Required for yt-dlp video+audio merging |
+| **Deno** | Auto-installed. Required by yt-dlp for YouTube JS challenge solving |
 
 > **Important:** `php-bcmath` is required for Mega.nz premium account login (RSA key decryption). Without it, Mega downloads fall back to anonymous mode with strict quota limits.
+
+#### Features
+
+- 📹 **yt-dlp Integration** — Download from YouTube, Vimeo, TikTok, Twitter/X, Instagram, Reddit, SoundCloud, and 1000+ sites with format/quality selector, real-time terminal progress, per-user cookie support
+- 🎨 **Two Templates** — "Flavor" (modern dark/light) and "PlugMod" (classic)
+- 🔌 **145+ Registered Plugins** — Mega.nz, Google Drive, MediaFire, Rapidgator, and many more
+- 🔐 **File Ownership** — Cookie-based isolation, users only see their own files
+- 📊 **Download Tracking** — Real-time progress, pending downloads tab
+- ⚡ **Auto Transload** — Batch download multiple links
+- 🧹 **Auto Cleanup** — Configurable auto-delete timer + 99% storage failsafe
+- 🛡️ **Mega Queue** — Only 1 Mega download at a time to prevent account abuse
+- 🍪 **Cookie Support** — Users can paste browser cookies (saved in localStorage) for YouTube login-required videos
+- 🛠️ **Admin Panel** — Server status, clear files, edit config/accounts, update yt-dlp/RAR/Deno, shell runner, activity logs
+
+#### yt-dlp Video Downloader
+
+The built-in yt-dlp plugin supports downloading from **1000+ websites** including:
+
+| Category | Sites |
+|---|---|
+| **Video** | YouTube, Vimeo, Twitch, TikTok, Instagram, Twitter/X, Reddit, Dailymotion, Streamable, BitChute, Rumble, Odysee, Bilibili, NicoVideo, Crunchyroll |
+| **Music** | SoundCloud, Bandcamp, Mixcloud |
+| **News** | CNN, BBC, CBS News, Washington Post, NY Times, The Guardian |
+| **Education** | TED, Udemy, Coursera |
+| **Other** | Archive.org, 9GAG, PeerTube, and hundreds more |
+
+**Features:**
+- Format/quality selector with thumbnail, title, duration, file sizes
+- Best quality auto-merge (video + audio → MP4)
+- Real-time terminal-style download progress
+- Per-user cookies (each user uses their own YouTube login, stored in browser localStorage)
+- Admin panel: one-click update yt-dlp, install Deno, manage cookies
+
+**Cookie Authentication:**
+Users can paste browser cookies for login-required videos in 3 ways:
+1. Main form → "Additional Cookie Value" checkbox → cookies.txt textarea (auto-saved in localStorage)
+2. Format selector page → "🍪 Login Required?" collapsible section
+3. Admin panel → yt-dlp card → Browser Cookies section (global fallback)
 
 #### PHP Extensions Install (if missing)
 
 ```bash
-# Replace 8.3 with your PHP version
-sudo apt install php8.3-bcmath php8.3-curl php8.3-openssl php8.3-mbstring -y
+sudo apt install php8.3-bcmath php8.3-curl php8.3-mbstring -y
 sudo systemctl restart apache2
 ```
 
@@ -46,20 +84,16 @@ Supported premium services: Mega.nz, 1Fichier, 4Shared, Alfafile, FileFactory, F
 
 #### Admin Panel
 
-Access at `/admin` (default credentials: admin/admin — change in `admin/index.php`).
+Access at `/admin` (default credentials: admin/admin — change in `configs/config.php`).
 
-Features: Server status, clear all files, edit premium accounts, one-click GitHub update, shell command runner.
-
-#### Features
-
-- 🎨 **Two Templates** — "Flavor" (modern dark/light) and "PlugMod" (classic)
-- 📹 **yt-dlp Integration** — Download from YouTube, Vimeo, TikTok, Twitter/X, Instagram, Reddit, SoundCloud, and 1000+ more sites with quality selector
-- 🔌 **60 Active Plugins** — Mega.nz, Google Drive, MediaFire, Rapidgator, and more
-- 🔐 **File Ownership** — Cookie-based isolation, users only see their own files
-- 📊 **Download Tracking** — Real-time progress, pending downloads tab
-- ⚡ **Auto Transload** — Batch download multiple links
-- 🧹 **Auto Cleanup** — Configurable auto-delete timer + 99% storage failsafe
-- 🛡️ **Mega Queue** — Only 1 Mega download at a time to prevent account abuse
+**Features:**
+- 📊 Server status (files, disk space, CPU)
+- ⚙️ Edit configuration & premium accounts
+- 📹 yt-dlp management (update binary, install Deno, manage cookies)
+- 📦 RAR binary management (update to latest)
+- 🔄 One-click GitHub update (preserves configs)
+- ⚡ Shell command runner
+- 📋 Activity logs with filtering & search
 
 #### Templates
 
@@ -71,9 +105,8 @@ Switch templates in `configs/config.php`:
 
 #### Actively Tested & Fixed Plugins (2026)
 
-The following plugins have been recently tested and confirmed working:
-
-✅ **Pornhub** — Full HLS stream support with quality selector (1080p/720p/480p/360p/240p)  
+✅ **yt-dlp Universal** — YouTube, Vimeo, TikTok, Twitter/X, Instagram, Reddit, 1000+ sites  
+✅ **Pornhub** — Full HLS stream support with quality selector  
 ✅ **Mega.nz** — Premium account support, download queue management  
 ✅ **Transfer.it** — Direct file downloads  
 ✅ **MediaFire** — Direct downloads without captcha
