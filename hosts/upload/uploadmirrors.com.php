@@ -1,4 +1,4 @@
-<?
+<?php
 ####### Default Free File Storage Provider. ###########
 $Default = "0"; //Set this variable to "1" to enable the autoupload compatibility
 #######################################
@@ -132,13 +132,13 @@ if ($continue_up)
 	
 ?>
 <script>document.getElementById('info').style.display='none';</script>
-<?
+<?php
 
 	$upfiles=upfile($url["host"],defport($url), $url["path"].($url["query"] ? "?".$url["query"] : ""),'http://uploadmirrors.com/', $cookies, $post, $lfile, $lname, "upfile_0");
 	
 ?>
 <script>document.getElementById('progressblock').style.display='none';</script>
-<?
+<?php
 	$page = geturl("uploadmirrors.com", 80, "/process.php?$upid", "", 0, 0, 0, "");
 	
 	sleep(2);

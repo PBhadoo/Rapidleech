@@ -172,7 +172,7 @@ if (!defined('RAPIDLEECH')) { require_once("index.html"); exit; }
                         <?php if (!$options['disable_email']) { ?>
                         <div class="fl-card" style="margin:0;box-shadow:none;background:var(--fl-surface-alt);">
                             <label class="rl-checkbox"><input type="checkbox" name="domail" id="domail" onclick="document.getElementById('emailtd').style.display=document.getElementById('splittd').style.display=this.checked?'':'none';document.getElementById('methodtd').style.display=(document.getElementById('splitchkbox').checked?(this.checked?'':'none'):'none');"<?php echo isset($_COOKIE['domail'])?' checked="checked"':''; ?>><strong><?php echo lang(237); ?></strong></label>
-                            <div id="emailtd"<?php echo isset($_COOKIE['domail'])?'':' style="display:none;"'; ?> style="margin-top:10px;"><label class="fl-label"><?php echo lang(238); ?></label><input type="text" name="email" id="email"<?php echo !empty($_COOKIE['email'])?' value="'.$_COOKIE['email'].'"':''; ?>></div>
+                            <div id="emailtd"<?php echo isset($_COOKIE['domail'])?'':' style="display:none;"'; ?> style="margin-top:10px;"><label class="fl-label"><?php echo lang(238); ?></label><input type="text" name="email" id="email"<?php echo !empty($_COOKIE['email'])?' value="'.htmlspecialchars($_COOKIE['email'],ENT_QUOTES,'UTF-8').'"':''; ?>></div>
                         </div>
                         <?php } ?>
 
@@ -190,8 +190,8 @@ if (!defined('RAPIDLEECH')) { require_once("index.html"); exit; }
                             <label class="rl-checkbox"><input type="checkbox" id="useproxy" name="useproxy" onclick="javascript:var d=this.checked?'':'none';document.getElementById('proxy').style.display=d;"<?php echo isset($_COOKIE["useproxy"])?' checked="checked"':''; ?>><strong><?php echo lang(245); ?></strong></label>
                             <div id="proxy"<?php echo isset($_COOKIE["useproxy"])?'':' style="display:none;"'; ?> style="margin-top:10px;">
                                 <div style="display:grid;gap:10px;">
-                                    <div><label class="fl-label"><?php echo lang(246); ?></label><input type="text" name="proxy" id="proxyproxy"<?php echo !empty($_COOKIE["proxy"])?' value="'.$_COOKIE["proxy"].'"':''; ?>></div>
-                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div><label class="fl-label"><?php echo lang(247); ?></label><input type="text" name="proxyuser" id="proxyuser"<?php echo !empty($_COOKIE["proxyuser"])?' value="'.$_COOKIE["proxyuser"].'"':''; ?>></div><div><label class="fl-label"><?php echo lang(248); ?></label><input type="password" name="proxypass" id="proxypass"<?php echo !empty($_COOKIE["proxypass"])?' value="'.$_COOKIE["proxypass"].'"':''; ?>></div></div>
+                                    <div><label class="fl-label"><?php echo lang(246); ?></label><input type="text" name="proxy" id="proxyproxy"<?php echo !empty($_COOKIE["proxy"])?' value="'.htmlspecialchars($_COOKIE["proxy"],ENT_QUOTES,'UTF-8').'"':''; ?>></div>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div><label class="fl-label"><?php echo lang(247); ?></label><input type="text" name="proxyuser" id="proxyuser"<?php echo !empty($_COOKIE["proxyuser"])?' value="'.htmlspecialchars($_COOKIE["proxyuser"],ENT_QUOTES,'UTF-8').'"':''; ?>></div><div><label class="fl-label"><?php echo lang(248); ?></label><input type="password" name="proxypass" id="proxypass"<?php echo !empty($_COOKIE["proxypass"])?' value="'.htmlspecialchars($_COOKIE["proxypass"],ENT_QUOTES,'UTF-8').'"':''; ?>></div></div>
                                 </div>
                             </div>
                         </div>
@@ -205,7 +205,7 @@ if (!defined('RAPIDLEECH')) { require_once("index.html"); exit; }
 
                         <div class="fl-card" style="margin:0;box-shadow:none;background:var(--fl-surface-alt);<?php echo !$options['download_dir_is_changeable']?'display:none;':''; ?>">
                             <label class="rl-checkbox"><input type="checkbox" name="saveto" id="saveto" onclick="javascript:var d=this.checked?'':'none';document.getElementById('path').style.display=d;"<?php echo isset($_COOKIE["saveto"])?' checked="checked"':''; ?>><strong><?php echo lang(252); ?></strong></label>
-                            <div id="path"<?php echo isset($_COOKIE["saveto"])?'':' style="display:none;"'; ?> style="margin-top:10px;"><label class="fl-label"><?php echo lang(253); ?></label><input type="text" name="path" value="<?php echo (!empty($_COOKIE["path"])?$_COOKIE["path"]:(substr($options['download_dir'],0,6)!="ftp://"?realpath(DOWNLOAD_DIR):$options['download_dir'])); ?>"></div>
+                            <div id="path"<?php echo isset($_COOKIE["saveto"])?'':' style="display:none;"'; ?> style="margin-top:10px;"><label class="fl-label"><?php echo lang(253); ?></label><input type="text" name="path" value="<?php echo htmlspecialchars(!empty($_COOKIE["path"])?$_COOKIE["path"]:(substr($options['download_dir'],0,6)!="ftp://"?realpath(DOWNLOAD_DIR):$options['download_dir']),ENT_QUOTES,'UTF-8'); ?>"></div>
                         </div>
 
                         <div class="fl-card" style="margin:0;box-shadow:none;background:var(--fl-surface-alt);">

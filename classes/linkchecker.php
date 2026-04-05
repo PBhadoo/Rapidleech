@@ -170,34 +170,35 @@ function check(&$link, $x, $regex, $szregex='', $pattern='', $replace='', $opt =
 
 function showlink($link, $size='', $chk=1, $title='') {
 	global $x;
+	$elink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
 	switch ($chk) {
 		case 1:
 			$cl = 'g';
-			$ret = "<a class='$cl' title='".lang(114)."' href='$link'><b>$link</b></a>";
+			$ret = "<a class='$cl' title='".lang(114)."' href='$elink'><b>$elink</b></a>";
 			if (!$_POST['d']) $ret = "$x: ".lang(114).": $ret";
 			if (!empty($size)) $ret .= " | <span title='".lang(56)."'>$size</span>";
 			break;
 		case 2:
 			$cl = 'y';
-			$ret = "<a class='$cl' title='".lang(115)."' href='$link'><b>$link</b></a>";
+			$ret = "<a class='$cl' title='".lang(115)."' href='$elink'><b>$elink</b></a>";
 			if (!$_POST['d']) $ret = "$x: ".lang(115).": $ret";
 			break;
 		case 3:
 			$cl = 'b';
-			$ret = "<a class='$cl' title='".htmlentities($title, ENT_QUOTES)."' href='$link'><b>$link</b></a>";
+			$ret = "<a class='$cl' title='".htmlspecialchars($title, ENT_QUOTES, 'UTF-8')."' href='$elink'><b>$elink</b></a>";
 			break;
 		case 4:
 			$cl = 'y';
-			$ret = "<b>$link&nbsp;???</b>";
+			$ret = "<b>$elink&nbsp;???</b>";
 			break;
 		default:
 			$cl = 'r';
-			$ret = "<a class='$cl' title='".lang(116)."' href='$link'><b>$link</b></a>";
+			$ret = "<a class='$cl' title='".lang(116)."' href='$elink'><b>$elink</b></a>";
 			if (!$_POST['d']) $ret = "$x: ".lang(116).": $ret";
 			break;
 	}
 
-	$ret = "<div class='$cl' style='text-align:left;'".(!empty($title)?" title='".htmlentities($title, ENT_QUOTES)."'":'').">$ret</div>\n";
+	$ret = "<div class='$cl' style='text-align:left;'".(!empty($title)?" title='".htmlspecialchars($title, ENT_QUOTES, 'UTF-8')."'":'').">$ret</div>\n";
 
 	echo $ret;
 	return $chk;

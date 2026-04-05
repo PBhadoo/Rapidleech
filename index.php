@@ -57,10 +57,8 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 
 	if (!empty($_GET['saveto']) && empty($_GET['path'])) html_error(lang(6));
 
-	if (!empty($_GET['domail']) && !checkmail($_GET['email'])) {
-		html_error(lang(3));
-		if (!empty($_GET['split']) && !is_numeric($_GET['partSize'])) html_error(lang(4)); // T-8: Check this.
-	}
+	if (!empty($_GET['domail']) && !checkmail($_GET['email'])) html_error(lang(3));
+	if (!empty($_GET['split']) && !is_numeric($_GET['partSize'])) html_error(lang(4));
 
 	$Url = parse_url($LINK);
 	$Url['scheme'] = strtolower($Url['scheme']);

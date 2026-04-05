@@ -466,8 +466,7 @@ class ftp_base {
 			$this->SendMSG('Error : Cannot get remote file list');
 			return -1;
 		}
-		reset($remote_list);
-		while (list(, $value) = each($remote_list)) {
+		foreach ($remote_list as $value) {
 			if ($value == basename($pathname)) {
 				$this->SendMSG("Remote file $pathname exists");
 				return TRUE;

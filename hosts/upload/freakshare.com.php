@@ -6,7 +6,7 @@ $freakshare_pass = "";
 
 $not_done=true;
 $continue_up=false;
-if ($freakshare_user & $freakshare_pass){
+if ($freakshare_user && $freakshare_pass){
 	$_REQUEST['fk_user'] = $freakshare_user;
 	$_REQUEST['fk_pass'] = $freakshare_pass;
 	$_REQUEST['action'] = "FORM";
@@ -27,7 +27,7 @@ else{
             <tr><td colspan=2 align=center><small>*You can set it as default in <b><?php echo $page_upload["freakshare.com"]; ?></b></small></tr>
         </form>
     </table>
-<?
+<?php
 }
 
 if ($continue_up)
@@ -112,7 +112,7 @@ if ($continue_up)
 function uid(){
 				$nu = "0123456789";
 				for($i=0; $i < 19; $i++){
-				$rand .= $nu{mt_rand() % strlen($nu)};
+				$rand .= $nu[mt_rand() % strlen($nu)];
 				}
 				return $rand;
 				//function by simplesdescraga 05/02/2012
@@ -124,7 +124,7 @@ function uuid(){
 				$contbase = strlen($hex);
 				$comple = '';
 						for($i=0; $i < 46; $i++){
-						$rand .= $ext{mt_rand() % strlen($ext)};
+						$rand .= $ext[mt_rand() % strlen($ext)];
 						}
 				$base = $rand;
 				for ($i = 0; $i < 32; $i++) {

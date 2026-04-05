@@ -9,7 +9,7 @@ function xmail($from, $to, $subj, $text, $filename, $partSize = FALSE, $method =
 	$fileContents = read_file ( $filename );
 	$fileSize = strlen ( $fileContents );
 	
-	if ($partSize != FALSE & $method == "tc") {
+	if ($partSize != FALSE && $method == "tc") {
 		$crc = strtoupper ( dechex ( crc32 ( $fileContents ) ) );
 		$crc = str_repeat ( "0", 8 - strlen ( $crc ) ) . $crc;
 	} else {
@@ -65,7 +65,7 @@ function xmail($from, $to, $subj, $text, $filename, $partSize = FALSE, $method =
 				}
 				echo "mail('".sprintf(lang(125),($i + 1))."...', '" . md5 ( basename ( $filename ) ) . "');\r\n";
 				flush ();
-				$mailed = $mailed & mail ( $to, $subj, $fileChunk, $multiHead );
+				$mailed = $mailed && mail ( $to, $subj, $fileChunk, $multiHead );
 				if (! $mailed) {
 					return false;
 				}
@@ -105,7 +105,7 @@ function xmail($from, $to, $subj, $text, $filename, $partSize = FALSE, $method =
 				}
 				echo "mail('".sprintf(lang(125),($i + 1))."...', '" . md5 ( basename ( $filename ) ) . "');\r\n";
 				flush ();
-				$mailed = $mailed & mail ( $to, $subj, $addHeads, $head );
+				$mailed = $mailed && mail ( $to, $subj, $addHeads, $head );
 				if (! $mailed) {
 					return false;
 				}

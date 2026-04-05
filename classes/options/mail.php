@@ -8,7 +8,7 @@ function rl_mail() {
 	for($i = 0; $i < count ( $_GET ["files"] ); $i ++) {
 		$file = $list [($_GET ["files"] [$i])];
 ?>
-                <input type="hidden" name="files[]" value="<?php echo $_GET ["files"] [$i]; ?>" /> <b><?php echo basename ( $file ["name"] ); ?></b><?php echo $i == count ( $_GET ["files"] ) - 1 ? "." : ",&nbsp"; ?>
+                <input type="hidden" name="files[]" value="<?php echo htmlspecialchars($_GET["files"][$i], ENT_QUOTES, 'UTF-8'); ?>" /> <b><?php echo htmlspecialchars(basename($file["name"]), ENT_QUOTES, 'UTF-8'); ?></b><?php echo $i == count($_GET["files"]) - 1 ? "." : ",&nbsp"; ?>
 <?php
 	}
 ?><br />
@@ -16,7 +16,7 @@ function rl_mail() {
 <table align="center">
 	<tr>
 		<td><?php echo lang(164); ?>:&nbsp;<input type="text" name="email"
-			value="<?php echo ($_COOKIE ["email"] ? $_COOKIE ["email"] : ""); ?>" />
+			value="<?php echo !empty($_COOKIE["email"]) ? htmlspecialchars($_COOKIE["email"], ENT_QUOTES, 'UTF-8') : ''; ?>" />
 		</td>
 		<td><input type="submit" value="Send" /></td>
 	</tr>
@@ -64,7 +64,7 @@ function mail_go() {
 	if (! checkmail ( $_POST ["email"] )) {
 		echo lang(166)."<br /><br />";
 	} else {
-		$_POST ["partSize"] = ((isset ( $_POST ["partSize"] ) & $_POST ["split"] == "on") ? $_POST ["partSize"] * 1024 * 1024 : FALSE);
+		$_POST ["partSize"] = ((isset ( $_POST ["partSize"] ) && $_POST ["split"] == "on") ? $_POST ["partSize"] * 1024 * 1024 : FALSE);
 		for($i = 0; $i < count ( $_POST ["files"] ); $i ++) {
 			$file = $list [$_POST ["files"] [$i]];
 			if (file_exists ( $file ["name"] )) {

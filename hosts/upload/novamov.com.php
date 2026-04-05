@@ -35,7 +35,7 @@ else{
 <tr><td colspan=2 align=center><input type=submit value='Upload'></tr>
 </table>
 </form>
-<?
+<?php
 }
 
 if ($continue_up)

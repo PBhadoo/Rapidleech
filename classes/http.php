@@ -20,7 +20,7 @@ function insert_timer($countd, $caption = '', $timeouttext = '', $hide = false) 
 	$countd = ceil($countd);
 
 	$timerid = jstime();
-	echo "\n<div id='timer_$timerid' align='center'>\n\t<br /><span class='caption'>$caption</span>&nbsp;&nbsp;\n\t<span id='timerlabel_$timerid' class='caption'></span>\n</div>\n<script type='text/javascript'>/* <![CDATA[ */\n\tvar count_$timerid = $countd;\n\tfunction timer_$timerid() {\n\t\tif (count_$timerid > 0) {\n\t\t\t$('#timerlabel_$timerid').html('". sprintf(lang(87), "' + count_$timerid + '") . "');\n\t\t\tcount_$timerid--;\n\t\t\tsetTimeout('timer_$timerid()', 1000);\n\t\t}";
+	echo "\n<div id='timer_$timerid' style='text-align:center;'>\n\t<br /><span class='caption'>$caption</span>&nbsp;&nbsp;\n\t<span id='timerlabel_$timerid' class='caption'></span>\n</div>\n<script type='text/javascript'>/* <![CDATA[ */\n\tvar count_$timerid = $countd;\n\tfunction timer_$timerid() {\n\t\tif (count_$timerid > 0) {\n\t\t\t$('#timerlabel_$timerid').html('". sprintf(lang(87), "' + count_$timerid + '") . "');\n\t\t\tcount_$timerid--;\n\t\t\tsetTimeout('timer_$timerid()', 1000);\n\t\t}";
 	if ($hide) echo "else $('#timer_$timerid').css('display', 'none');";
 	elseif (!empty($timeouttext)) echo "else $('#timer_$timerid').html('" . addslashes($timeouttext) . "');";
 	echo "\n\t} timer_$timerid();\n/* ]]> */</script>";

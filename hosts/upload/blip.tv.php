@@ -59,5 +59,5 @@ if ($_POST['action'] == 'upload_go')  {   foreach ($_POST as $key => $val)   {  
 	</tr>
 	</table>
 	</form>
-<?
+<?php
 }

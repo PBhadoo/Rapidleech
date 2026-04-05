@@ -87,20 +87,20 @@ if (function_exists('apache_get_version')) {
 	}
 }
 ?>
-<center><img src="<?php echo TEMPLATE_DIR; ?>images/logo_pm.gif" alt="RapidLeech PlugMod" border="0" /></center>
+<div style="text-align:center;"><img src="<?php echo TEMPLATE_DIR; ?>images/logo_pm.gif" alt="RapidLeech PlugMod" style="border:0;" /></div>
 <br />
-<table border="0" width="100%" align="center">
+<table style="width:100%;border:0;">
 	<tr>
 		<td>
-			<div align="center">
-				<table border="1" cellpadding="20" style="border-collapse: collapse">
+			<div style="text-align:center;">
+				<table style="border-collapse:collapse;border:1px solid;">
 					<tr>
-						<td align="center" style="font-family: 'Verdana'; font-size: smaller">
+						<td style="text-align:center;padding:20px;font-family:'Verdana';font-size:smaller;">
 							<b><?php echo lang(313); ?></b>
 						</td>
 					</tr>
 					<tr>
-						<td align="center" style="font-family: 'Verdana'; font-size: smaller;">
+						<td style="text-align:center;padding:20px;font-family:'Verdana';font-size:smaller;">
 							<b><?php echo lang(314); ?></b>: <?php echo $fsockopen; ?><br /><br />
 							<b><?php echo lang(315); ?></b>: <?php echo $memory_limit; ?><br /><br />
 							<b><?php echo lang(316); ?></b>: <?php echo $safemode; ?><br /><br />

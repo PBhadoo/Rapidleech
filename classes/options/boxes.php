@@ -8,7 +8,7 @@ function boxes() {
 	for($i = 0; $i < count ( $_GET ["files"] ); $i ++) {
 		$file = $list [($_GET ["files"] [$i])];
 ?>
-	<input type="hidden" name="files[]" value="<?php echo $_GET ["files"] [$i]; ?>" /> <b><?php echo basename ( $file ["name"] ); ?></b><?php echo $i == count ( $_GET ["files"] ) - 1 ? "." : ",&nbsp"; ?>
+	<input type="hidden" name="files[]" value="<?php echo htmlspecialchars($_GET["files"][$i], ENT_QUOTES, 'UTF-8'); ?>" /> <b><?php echo htmlspecialchars(basename($file["name"]), ENT_QUOTES, 'UTF-8'); ?></b><?php echo $i == count($_GET["files"]) - 1 ? "." : ",&nbsp"; ?>
 <?php
 	}
 ?><br />
@@ -16,8 +16,8 @@ function boxes() {
 <table align="center">
 	<tr>
 		<td><?php echo lang(139); ?>:&nbsp;<textarea name="emails" cols="30" rows="8"><?php
-	if ($_COOKIE ["email"])
-		echo $_COOKIE ["email"];
+	if (!empty($_COOKIE["email"]))
+		echo htmlspecialchars($_COOKIE["email"], ENT_QUOTES, 'UTF-8');
 		?></textarea>
 		</td>
 	<td><input type="submit" value="<?php echo lang(140); ?>" /></td>
@@ -63,7 +63,7 @@ function boxes() {
 function boxes_go() {
 	global $list, $options, $fromaddr;
 	require_once (CLASS_DIR . "mail.php");
-	$_POST ["partSize"] = ((isset ( $_POST ["partSize"] ) & $_POST ["split"] == "on") ? $_POST ["partSize"] * 1024 * 1024 : FALSE);
+	$_POST ["partSize"] = ((isset ( $_POST ["partSize"] ) && $_POST ["split"] == "on") ? $_POST ["partSize"] * 1024 * 1024 : FALSE);
 	$v_mails = explode ( "\n", $_POST['emails'] );
 	$v_min = count ( (count ( $_POST ["files"] ) < count ( $v_mails )) ? $_POST ["files"] : $v_mails );
 	

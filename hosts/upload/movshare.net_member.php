@@ -1,4 +1,4 @@
-<?
+<?php
 ####### Free/default Account Info. ###########
 $movsh_login = "";
 $movsh_pass = "";
@@ -85,13 +85,13 @@ if ($continue_up)
 	$refup2='http://95.211.84.49/';
 ?>
 <script>document.getElementById('info').style.display='none';</script>
-<?
+<?php
 
 	$upfiles=upfile($url["host"],defport($url), $url["path"].($url["query"] ? "?".$url["query"] : ""), $refup2, 0, $post, $lfile, $lname, "upfile_0");
 
 ?>
 <script>document.getElementById('progressblock').style.display='none';</script>
-<?
+<?php
 	is_page($upfiles);
 	$locat=cut_str($upfiles,'The document has moved <a href="','"');
 	$Url=parse_url($locat);
