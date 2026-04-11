@@ -7,20 +7,41 @@ if (!defined('RAPIDLEECH')) {
 class sourceforge_net extends DownloadClass {
 
     public function Download($link) {
-        $page = $this->GetPage($link);
+
+        // Normalize link
+        $link = trim($link);
+
+        // Match SourceForge file URL
+        if (!preg_match('#https?://sourceforge\.net/projects/([^/]+)/files/(.+?)/download#i', $link, $m)) {
+            html_error('Invalid SourceForge link!');
+        }
+
+        $project = $m[1];
+        $filepath = $m[2];
+
+        // Build direct mirror link (modern method)
+        $dlink = "https://master.dl.sourceforge.net/project/{$project}/{$filepath}?viasf=1";
+
+        // Extract filename
+        $FileName = basename($filepath);
+
+        // Optional: try to fetch headers for better filename
+        $page = $this->GetPage($dlink);
         $cookie = GetCookies($page);
-        if (!preg_match('%<a href="(.*)" class="direct-download">%', $page, $tmp)) html_error('Can\'t find sourceforge redirect link!');
-        $temp = html_entity_decode(urldecode(trim($tmp[1])), ENT_QUOTES, 'UTF-8');
-        $t1 = cut_str($temp, 'http://downloads.', '?r');
-        $t2 = cut_str($temp, 'use_mirror=', '\n');
-        $dlink = "http://$t2.dl.$t1";
-        $filename = parse_url($dlink);
-        $FileName = basename($filename['path']);
+
+        if (preg_match('/Content-Disposition:.*filename="?([^"]+)"?/i', $page, $fn)) {
+            $FileName = $fn[1];
+        }
+
+        // Start download
         $this->RedirectDownload($dlink, $FileName, $cookie, 0, $link);
     }
 }
 
 /*
- * rewritten into OOP format by Ruud v.Tony 27-09-2011
+ * Updated for modern SourceForge (2026)
+ * - Removed deprecated direct-download parsing
+ * - Uses master.dl.sourceforge.net mirror system
+ * - Works with new /download URLs
  */
 ?>
