@@ -586,7 +586,8 @@ switch ($_GET['ajax']) {
 			echo 'free';
 		} else {
 			$lockData = @json_decode(@file_get_contents($lockFile), true);
-			if (!$lockData || (time() - $lockData['time']) > 300) {
+			$lockAge = time() - (!empty($lockData['start_time']) ? $lockData['start_time'] : (!empty($lockData['time']) ? $lockData['time'] : 0));
+			if (!$lockData || $lockAge > 1800) {
 				echo 'free';
 			} else {
 				echo 'busy';

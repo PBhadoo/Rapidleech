@@ -103,11 +103,11 @@ class mega_co_nz extends DownloadClass {
 	private function checkMegaQueue($link) {
 		$lockFile = DOWNLOAD_DIR . '.mega_lock';
 		$maxWait = 600; // Max 10 minutes wait
-		$staleTimeout = 300; // Consider lock stale after 5 minutes of no update
+		$staleTimeout = 1800; // Consider lock stale after 30 minutes (downloads can be large)
 
 		// If no lock exists, we're first - create it and proceed
 		if (!file_exists($lockFile)) {
-			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
+			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'start_time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
 			// Register cleanup on shutdown
 			register_shutdown_function(array($this, 'releaseMegaLock'));
 			return;
@@ -115,10 +115,11 @@ class mega_co_nz extends DownloadClass {
 
 		// Lock exists - check if it's stale
 		$lockData = @json_decode(@file_get_contents($lockFile), true);
-		if (!$lockData || (time() - $lockData['time']) > $staleTimeout) {
+		$lockAge = time() - (!empty($lockData['start_time']) ? $lockData['start_time'] : (!empty($lockData['time']) ? $lockData['time'] : 0));
+		if (!$lockData || $lockAge > $staleTimeout) {
 			// Stale lock - remove and take over
 			@unlink($lockFile);
-			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
+			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'start_time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
 			register_shutdown_function(array($this, 'releaseMegaLock'));
 			return;
 		}

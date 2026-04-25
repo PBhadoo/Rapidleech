@@ -107,6 +107,122 @@ if (isset($_GET['check_ytdlp'])) {
     exit;
 }
 
+// Resolve download directory path (works for both relative and absolute config values)
+function admin_dl_dir($rootDir, $options) {
+    $dir = isset($options['download_dir']) ? $options['download_dir'] : 'files/';
+    if (substr($dir, 0, 1) !== '/') $dir = $rootDir . '/' . $dir;
+    return rtrim($dir, '/') . '/';
+}
+
+// AJAX: get active downloads + mega lock status
+if (isset($_GET['get_pending'])) {
+    header('Content-Type: application/json');
+    $result = array('downloads' => array(), 'mega_lock' => null, 'queue' => array());
+
+    // Active downloads from downloads.lst
+    $dlsFile = $configDir . '/downloads.lst';
+    $dlContent = @file_get_contents($dlsFile);
+    if ($dlContent) {
+        $dls = @unserialize($dlContent);
+        if (is_array($dls)) {
+            $now = time();
+            foreach ($dls as $id => $dl) {
+                if (($now - $dl['last_update']) > 120) continue;
+                $result['downloads'][] = array(
+                    'id' => $id,
+                    'filename' => $dl['filename'],
+                    'pid' => $dl['pid'],
+                    'percent' => $dl['percent'],
+                    'status' => $dl['status'],
+                    'elapsed' => $now - $dl['start_time'],
+                );
+            }
+        }
+    }
+
+    // Mega lock
+    $dlDir = admin_dl_dir($rootDir, $options);
+    $megaLock = $dlDir . '.mega_lock';
+    if (file_exists($megaLock)) {
+        $ld = @json_decode(@file_get_contents($megaLock), true);
+        $startT = !empty($ld['start_time']) ? $ld['start_time'] : (!empty($ld['time']) ? $ld['time'] : time());
+        $result['mega_lock'] = array(
+            'pid' => $ld['pid'] ?? 0,
+            'link' => $ld['link'] ?? 'unknown',
+            'elapsed' => time() - $startT,
+        );
+    }
+
+    // Chunk downloads in progress (files/.chunk_*.meta)
+    if (is_dir($dlDir)) {
+        foreach (scandir($dlDir) as $f) {
+            if (preg_match('/^\.chunk_[a-f0-9]+\.meta$/', $f)) {
+                $meta = @json_decode(@file_get_contents($dlDir . $f), true);
+                if ($meta && isset($meta['filename'])) {
+                    $result['queue'][] = array(
+                        'filename' => $meta['filename'],
+                        'status' => $meta['status'] ?? 'downloading',
+                        'filesize' => $meta['filesize'] ?? 0,
+                    );
+                }
+            }
+        }
+    }
+
+    echo json_encode($result);
+    exit;
+}
+
+// AJAX: clear mega lock
+if (isset($_GET['clear_mega_lock'])) {
+    header('Content-Type: application/json');
+    $megaLock = admin_dl_dir($rootDir, $options) . '.mega_lock';
+    if (file_exists($megaLock)) {
+        @unlink($megaLock);
+        echo json_encode(array('success' => true));
+    } else {
+        echo json_encode(array('success' => false, 'error' => 'Lock file not found'));
+    }
+    exit;
+}
+
+// AJAX: kill download by PID
+if (isset($_GET['kill_pid'])) {
+    header('Content-Type: application/json');
+    $pid = intval($_GET['kill_pid']);
+    if ($pid > 1) {
+        $isWin = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+        if ($isWin) {
+            $out = @shell_exec('taskkill /PID ' . $pid . ' /F 2>&1');
+        } else {
+            $out = @shell_exec('kill -9 ' . $pid . ' 2>&1');
+        }
+        // Remove from downloads.lst
+        $dlsFile = $configDir . '/downloads.lst';
+        $dlContent = @file_get_contents($dlsFile);
+        if ($dlContent) {
+            $dls = @unserialize($dlContent);
+            if (is_array($dls)) {
+                foreach ($dls as $id => $dl) {
+                    if ($dl['pid'] == $pid) unset($dls[$id]);
+                }
+                @file_put_contents($dlsFile, serialize($dls), LOCK_EX);
+            }
+        }
+        // Also release mega lock if PID matches
+        $megaLock = admin_dl_dir($rootDir, $options) . '.mega_lock';
+        if (file_exists($megaLock)) {
+            $ld = @json_decode(@file_get_contents($megaLock), true);
+            if ($ld && ($ld['pid'] ?? 0) == $pid) @unlink($megaLock);
+        }
+        rl_log_admin('Kill download', "PID $pid killed");
+        echo json_encode(array('success' => true, 'output' => $out));
+    } else {
+        echo json_encode(array('success' => false, 'error' => 'Invalid PID'));
+    }
+    exit;
+}
+
 $message = '';
 $messageType = '';
 
@@ -418,6 +534,25 @@ label.check input{accent-color:#6366f1}
         <div class="bar-track"><div class="bar-fill" style="width:<?php echo $diskUsedPercent; ?>%"></div></div>
     </div>
 
+    <!-- Active Downloads -->
+    <div class="card" id="active-downloads-card">
+        <h2>⚡ Active Downloads <span id="active-count" style="font-size:13px;color:#606880;font-weight:400"></span>
+            <button onclick="loadPending()" class="btn btn-ghost" style="padding:5px 12px;font-size:12px;float:right">↻ Refresh</button>
+        </h2>
+        <div id="pending-list">
+            <div style="color:#606880;font-size:13px;text-align:center;padding:20px">Loading...</div>
+        </div>
+        <div id="mega-lock-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #282d3e">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                <div>
+                    <span style="color:#f59e0b;font-weight:600">🔒 Mega Lock Active</span>
+                    <span id="mega-lock-info" style="color:#a0a8c0;font-size:13px;margin-left:8px"></span>
+                </div>
+                <button onclick="clearMegaLock()" class="btn btn-warning" style="padding:6px 14px;font-size:12px">🔓 Release Mega Lock</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Clear Files -->
     <div class="card">
         <h2>🗑️ Clear All Downloads</h2>
@@ -708,5 +843,77 @@ label.check input{accent-color:#6366f1}
         <br>&copy; <?php echo date('Y'); ?> <a href="https://github.com/PBhadoo/Rapidleech" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:none;">PBhadoo</a>. All rights reserved.
     </div>
 </div>
+<script>
+function fmtSeconds(s){if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m '+Math.floor(s%60)+'s';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';}
+function fmtBytes(b){if(!b||b<=0)return '0 B';var s=['B','KB','MB','GB','TB'],e=Math.floor(Math.log(b)/Math.log(1024));return (b/Math.pow(1024,e)).toFixed(2)+' '+s[e];}
+
+function loadPending(){
+    fetch('?get_pending=1').then(r=>r.json()).then(data=>{
+        var list=document.getElementById('pending-list');
+        var rows='';
+
+        // downloads.lst entries
+        if(data.downloads&&data.downloads.length>0){
+            data.downloads.forEach(function(dl){
+                rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e2231;flex-wrap:wrap">';
+                rows+='<div style="flex:1;min-width:200px">';
+                rows+='<div style="font-weight:500;color:#e8ecf4">'+escHtml(dl.filename||'Unknown')+'</div>';
+                rows+='<div style="font-size:12px;color:#606880;margin-top:2px">PID: '+dl.pid+' &nbsp;·&nbsp; Elapsed: '+fmtSeconds(dl.elapsed)+' &nbsp;·&nbsp; Status: '+escHtml(dl.status)+'</div>';
+                if(dl.percent>0){rows+='<div style="height:4px;background:#282d3e;border-radius:2px;margin-top:6px"><div style="height:100%;width:'+dl.percent+'%;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:2px"></div></div>';}
+                rows+='</div>';
+                rows+='<button onclick="killPid('+dl.pid+')" class="btn btn-danger" style="padding:5px 12px;font-size:12px">✕ Cancel</button>';
+                rows+='</div>';
+            });
+        }
+
+        // Chunk/queue downloads
+        if(data.queue&&data.queue.length>0){
+            data.queue.forEach(function(q){
+                rows+='<div style="padding:10px 0;border-bottom:1px solid #1e2231">';
+                rows+='<div style="font-weight:500;color:#e8ecf4">'+escHtml(q.filename)+'</div>';
+                rows+='<div style="font-size:12px;color:#606880;margin-top:2px">'+escHtml(q.status)+' &nbsp;·&nbsp; Size: '+fmtBytes(q.filesize)+'</div>';
+                rows+='</div>';
+            });
+        }
+
+        if(!rows){
+            rows='<div style="color:#606880;font-size:13px;text-align:center;padding:20px">No active downloads.</div>';
+        }
+        list.innerHTML=rows;
+        document.getElementById('active-count').textContent='('+(data.downloads.length+data.queue.length)+' active)';
+
+        // Mega lock
+        var lockSec=document.getElementById('mega-lock-section');
+        if(data.mega_lock){
+            lockSec.style.display='block';
+            document.getElementById('mega-lock-info').textContent='PID: '+data.mega_lock.pid+' · '+escHtml(data.mega_lock.link)+'... · Running: '+fmtSeconds(data.mega_lock.elapsed);
+        } else {
+            lockSec.style.display='none';
+        }
+    }).catch(function(){
+        document.getElementById('pending-list').innerHTML='<div style="color:#ef4444;font-size:13px;text-align:center;padding:20px">Error loading downloads.</div>';
+    });
+}
+
+function killPid(pid){
+    if(!confirm('Kill download process PID '+pid+'?')) return;
+    fetch('?kill_pid='+pid).then(r=>r.json()).then(function(d){
+        if(d.success){loadPending();}else{alert('Failed: '+(d.error||'unknown error'));}
+    });
+}
+
+function clearMegaLock(){
+    if(!confirm('Release the Mega lock? Only do this if the download is stuck or crashed.')) return;
+    fetch('?clear_mega_lock=1').then(r=>r.json()).then(function(d){
+        if(d.success){loadPending();}else{alert('Failed: '+(d.error||'unknown error'));}
+    });
+}
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Load immediately and refresh every 5 seconds
+loadPending();
+setInterval(loadPending, 5000);
+</script>
 </body>
 </html>
