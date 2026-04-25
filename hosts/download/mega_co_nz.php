@@ -480,7 +480,7 @@ class mega_co_nz extends DownloadClass {
 		uasort($dfiles, array($this, 'FSort'));
 
 		$files = array();
-		foreach ($dfiles as $file => $key) $files[] = "https://mega.nz/#N!$file!{$key['k']}!$fnid!Rapidleech";
+		foreach ($dfiles as $file => $key) $files[] = "https://mega.nz/#N!$file!{$key['k']}!$fnid!Rapidleech?filename=" . rawurlencode($key['n']);
 		$this->moveToAutoDownloader($files);
 	}
 
