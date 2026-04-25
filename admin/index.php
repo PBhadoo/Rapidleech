@@ -847,8 +847,9 @@ label.check input{accent-color:#6366f1}
 function fmtSeconds(s){if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m '+Math.floor(s%60)+'s';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';}
 function fmtBytes(b){if(!b||b<=0)return '0 B';var s=['B','KB','MB','GB','TB'],e=Math.floor(Math.log(b)/Math.log(1024));return (b/Math.pow(1024,e)).toFixed(2)+' '+s[e];}
 
+var _adminPath = window.location.pathname;
 function loadPending(){
-    fetch('?get_pending=1').then(r=>r.json()).then(data=>{
+    fetch(_adminPath+'?get_pending=1').then(r=>r.json()).then(data=>{
         var list=document.getElementById('pending-list');
         var rows='';
 
@@ -897,14 +898,14 @@ function loadPending(){
 
 function killPid(pid){
     if(!confirm('Kill download process PID '+pid+'?')) return;
-    fetch('?kill_pid='+pid).then(r=>r.json()).then(function(d){
+    fetch(_adminPath+'?kill_pid='+pid).then(r=>r.json()).then(function(d){
         if(d.success){loadPending();}else{alert('Failed: '+(d.error||'unknown error'));}
     });
 }
 
 function clearMegaLock(){
     if(!confirm('Release the Mega lock? Only do this if the download is stuck or crashed.')) return;
-    fetch('?clear_mega_lock=1').then(r=>r.json()).then(function(d){
+    fetch(_adminPath+'?clear_mega_lock=1').then(r=>r.json()).then(function(d){
         if(d.success){loadPending();}else{alert('Failed: '+(d.error||'unknown error'));}
     });
 }
