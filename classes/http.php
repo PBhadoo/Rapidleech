@@ -114,7 +114,15 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 		// 3. parallel_download option is not disabled
 		$minSizeForParallel = 2 * 1024 * 1024; // 2MB minimum
 		$useParallel = !empty($options['parallel_download']) || !isset($options['parallel_download']); // Default enabled
-		
+		// Hosts matched by a plugin use CheckBack() for post-processing (e.g. Mega decryption).
+		// CheckBack() attaches a PHP stream filter which cURL-based parallel download cannot use.
+		// Skip parallel for these hosts so single-stream triggers CheckBack correctly.
+		if ($useParallel && !empty($GLOBALS['host'])) {
+			foreach ($GLOBALS['host'] as $_site => $_file) {
+				if (host_matches($_site, $host)) { $useParallel = false; break; }
+			}
+		}
+
 		if ($resumeInfo && $resumeInfo['supports_resume'] && $resumeInfo['content_length'] > $minSizeForParallel && $useParallel) {
 			// Check file size limit
 			if ($options['file_size_limit'] > 0 && ($resumeInfo['content_length'] > ($options['file_size_limit'] * 1024 * 1024))) {
@@ -1326,6 +1334,9 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
             
             echo "<script type='text/javascript'>pr('$percent', '$received', '$speed');</script>";
             flush();
+            if (!empty($GLOBALS['current_download_id']) && function_exists('update_download_progress')) {
+                update_download_progress($GLOBALS['current_download_id'], $totalDownloaded, $fileSize);
+            }
             $lastUpdate = $now;
         }
         
