@@ -611,26 +611,25 @@ switch ($_GET['ajax']) {
 		break;
 	case 'mega_queue_check':
 		if (!defined('DOWNLOAD_DIR')) define('DOWNLOAD_DIR', $options['download_dir']);
-		$lockFile = DOWNLOAD_DIR . '.mega_lock';
 		header('Content-Type: application/json');
-		if (!file_exists($lockFile)) {
-			echo json_encode(array('status' => 'free'));
+		$staleTimeout = 1800;
+		$maxSlots = 5;
+		$activeDownloads = array();
+		foreach (glob(DOWNLOAD_DIR . '.mega_slot_*') ?: array() as $slotFile) {
+			$d = @json_decode(@file_get_contents($slotFile), true);
+			$age = time() - (!empty($d['start_time']) ? $d['start_time'] : 0);
+			if (!$d || $age > $staleTimeout) { @unlink($slotFile); continue; }
+			$activeDownloads[] = array(
+				'filename'   => !empty($d['filename']) ? $d['filename'] : '',
+				'size'       => !empty($d['size']) ? $d['size'] : 0,
+				'start_time' => !empty($d['start_time']) ? $d['start_time'] : 0,
+				'elapsed'    => $age,
+			);
+		}
+		if (count($activeDownloads) < $maxSlots) {
+			echo json_encode(array('status' => 'free', 'active' => count($activeDownloads), 'max' => $maxSlots));
 		} else {
-			$lockData = @json_decode(@file_get_contents($lockFile), true);
-			$lockAge = time() - (!empty($lockData['start_time']) ? $lockData['start_time'] : (!empty($lockData['time']) ? $lockData['time'] : 0));
-			if (!$lockData || $lockAge > 1800) {
-				echo json_encode(array('status' => 'free'));
-			} else {
-				$elapsed = $lockAge;
-				$resp = array(
-					'status'   => 'busy',
-					'elapsed'  => $elapsed,
-					'filename' => !empty($lockData['filename']) ? $lockData['filename'] : '',
-					'size'     => !empty($lockData['size']) ? $lockData['size'] : '',
-					'link_preview' => !empty($lockData['link']) ? substr($lockData['link'], 0, 40) . '…' : '',
-				);
-				echo json_encode($resp);
-			}
+			echo json_encode(array('status' => 'busy', 'downloads' => $activeDownloads, 'max' => $maxSlots));
 		}
 		break;
 	case 'linkcheck':

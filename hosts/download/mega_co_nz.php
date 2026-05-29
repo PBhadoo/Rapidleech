@@ -5,7 +5,7 @@ if (!defined('RAPIDLEECH')) {
 }
 // Using functions from: http://julien-marchand.fr/blog/using-the-mega-api-with-php-examples/
 class mega_co_nz extends DownloadClass {
-	private $useOpenSSL, $useOldFilter, $seqno, $cookie;
+	private $useOpenSSL, $useOldFilter, $seqno, $cookie, $mySlotFile = '';
 	public function Download($link) {
 		$this->checkCryptDependences();
 		$this->checkMegaQueue($link);
@@ -99,60 +99,75 @@ class mega_co_nz extends DownloadClass {
 	}
 
 	// ============================================
-	// MEGA DOWNLOAD QUEUE: Only 1 Mega download at a time
-	// Uses a lock file to prevent concurrent downloads
+	// MEGA DOWNLOAD QUEUE: up to 5 concurrent downloads
+	// Each download claims one slot file: .mega_slot_{pid}
 	// ============================================
+	const MEGA_MAX_SLOTS   = 5;
+	const MEGA_STALE_SECS  = 1800; // 30 min — consider slot abandoned
+	const MEGA_MAX_WAIT    = 600;  // 10 min — queue page timeout
+	const MEGA_RETRY_SECS  = 5;
+
+	private function megaSlotFiles() {
+		return glob(DOWNLOAD_DIR . '.mega_slot_*') ?: array();
+	}
+
+	private function megaActiveSlots() {
+		$active = array();
+		foreach ($this->megaSlotFiles() as $f) {
+			$d = @json_decode(@file_get_contents($f), true);
+			$age = time() - (!empty($d['start_time']) ? $d['start_time'] : 0);
+			if (!$d || $age > self::MEGA_STALE_SECS) { @unlink($f); continue; }
+			$active[] = array('file' => $f, 'data' => $d);
+		}
+		return $active;
+	}
+
 	private function checkMegaQueue($link) {
-		$lockFile = DOWNLOAD_DIR . '.mega_lock';
-		$maxWait = 600; // Max 10 minutes wait
-		$staleTimeout = 1800; // Consider lock stale after 30 minutes (downloads can be large)
+		// Remove legacy single-lock file if still present
+		$legacyLock = DOWNLOAD_DIR . '.mega_lock';
+		if (file_exists($legacyLock)) @unlink($legacyLock);
 
-		// If no lock exists, we're first - create it and proceed
-		if (!file_exists($lockFile)) {
-			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'start_time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
-			// Register cleanup on shutdown
+		$active = $this->megaActiveSlots();
+
+		if (count($active) < self::MEGA_MAX_SLOTS) {
+			$this->mySlotFile = DOWNLOAD_DIR . '.mega_slot_' . getmypid();
+			@file_put_contents($this->mySlotFile, json_encode(array(
+				'pid'        => getmypid(),
+				'time'       => time(),
+				'start_time' => time(),
+				'link'       => $link,
+			)), LOCK_EX);
 			register_shutdown_function(array($this, 'releaseMegaLock'));
-			return;
+			return; // slot acquired — proceed with download
 		}
 
-		// Lock exists - check if it's stale
-		$lockData = @json_decode(@file_get_contents($lockFile), true);
-		$lockAge = time() - (!empty($lockData['start_time']) ? $lockData['start_time'] : (!empty($lockData['time']) ? $lockData['time'] : 0));
-		if (!$lockData || $lockAge > $staleTimeout) {
-			// Stale lock - remove and take over
-			@unlink($lockFile);
-			@file_put_contents($lockFile, json_encode(array('pid' => getmypid(), 'time' => time(), 'start_time' => time(), 'link' => substr($link, 0, 60))), LOCK_EX);
-			register_shutdown_function(array($this, 'releaseMegaLock'));
-			return;
-		}
-
-		// Another download is active - show queue page with auto-retry
-		$retryInterval = 5;
+		// All slots full — show queue page
+		$retryInterval = self::MEGA_RETRY_SECS;
 		$form = $this->DefaultParamArr($link);
 
-		$initialFilename = !empty($lockData['filename']) ? $lockData['filename'] : '';
-		$initialSize     = !empty($lockData['size']) ? $lockData['size'] : 0;
-		$initialElapsed  = time() - (!empty($lockData['start_time']) ? $lockData['start_time'] : time());
-		$linkPreview     = !empty($lockData['link']) ? htmlspecialchars(substr($lockData['link'], 0, 40)) . '…' : 'mega.nz/…';
-
-		echo '<div style="max-width:600px;margin:30px auto;padding:0 16px;">';
+		echo '<div style="max-width:640px;margin:30px auto;padding:0 16px;">';
 		echo '<h3 style="text-align:center;color:var(--fl-accent,#6366f1);">⏳ Mega Download Queue</h3>';
-		echo '<p style="text-align:center;opacity:.7;">Your download will start automatically when the slot is free.</p>';
+		echo '<p style="text-align:center;opacity:.7;">All ' . self::MEGA_MAX_SLOTS . ' download slots are busy. Your download starts automatically when one frees up.</p>';
 
-		// Active download card
-		echo '<div style="margin:20px 0;padding:18px;background:var(--fl-surface-alt,#1e2231);border-radius:12px;border:1px solid var(--fl-border,#2d3148);">';
-		echo '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.5;margin-bottom:10px;">Currently Downloading</div>';
-		echo '<div id="mq_filename" style="font-weight:600;font-size:15px;margin-bottom:6px;word-break:break-all;">'
-			. ($initialFilename ? htmlspecialchars($initialFilename) : '<span style="opacity:.5;">' . $linkPreview . '</span>') . '</div>';
-		echo '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;opacity:.7;">';
-		echo '<span>🕒 Running: <b id="mq_elapsed">' . gmdate('H:i:s', $initialElapsed) . '</b></span>';
-		if ($initialSize) echo '<span>📦 Size: <b>' . htmlspecialchars(bytesToKbOrMbOrGb($initialSize)) . '</b></span>';
-		else echo '<span>📦 Size: <b id="mq_size">—</b></span>';
-		echo '</div>';
+		// One card per active slot
+		echo '<div id="mq_slots">';
+		foreach ($active as $i => $s) {
+			$d        = $s['data'];
+			$elapsed  = time() - (!empty($d['start_time']) ? $d['start_time'] : time());
+			$filename = !empty($d['filename']) ? htmlspecialchars($d['filename']) : '<span style="opacity:.5;">' . htmlspecialchars(substr($d['link'] ?? 'mega.nz/…', 0, 40)) . '…</span>';
+			$sizeStr  = !empty($d['size']) ? htmlspecialchars(bytesToKbOrMbOrGb($d['size'])) : '—';
+			echo '<div class="mq-card" data-slot="' . $i . '" style="margin:10px 0;padding:14px 18px;background:var(--fl-surface-alt,#1e2231);border-radius:10px;border:1px solid var(--fl-border,#2d3148);">';
+			echo '<div style="font-size:11px;text-transform:uppercase;opacity:.45;margin-bottom:6px;">Slot ' . ($i + 1) . '</div>';
+			echo '<div class="mq-fname" style="font-weight:600;font-size:14px;margin-bottom:4px;word-break:break-all;">' . $filename . '</div>';
+			echo '<div style="display:flex;gap:16px;font-size:12px;opacity:.65;">';
+			echo '<span>🕒 <span class="mq-elapsed" data-start="' . (int)(!empty($d['start_time']) ? $d['start_time'] : time()) . '">' . gmdate('H:i:s', $elapsed) . '</span></span>';
+			echo '<span>📦 <span class="mq-size">' . $sizeStr . '</span></span>';
+			echo '</div>';
+			echo '</div>';
+		}
 		echo '</div>';
 
-		// Queue status
-		echo '<div id="mq_status" style="text-align:center;padding:12px;background:var(--fl-surface-alt,#1e2231);border-radius:10px;font-size:13px;opacity:.8;">';
+		echo '<div id="mq_status" style="text-align:center;margin-top:14px;padding:11px;background:var(--fl-surface-alt,#1e2231);border-radius:10px;font-size:13px;opacity:.8;">';
 		echo 'Checking every ' . $retryInterval . 's…';
 		echo '</div>';
 		echo '</div>';
@@ -162,9 +177,16 @@ class mega_co_nz extends DownloadClass {
 		echo "</form>\n";
 
 		echo "<script>
-		var mqRetries=0, mqMax=" . intval($maxWait / $retryInterval) . ", mqStart=" . ($initialElapsed ?: 0) . ";
-		var mqElapsedSec=mqStart;
-		setInterval(function(){ mqElapsedSec++; var h=Math.floor(mqElapsedSec/3600),m=Math.floor((mqElapsedSec%3600)/60),s=mqElapsedSec%60; document.getElementById('mq_elapsed').textContent=(h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }, 1000);
+		var mqRetries=0, mqMax=" . intval(self::MEGA_MAX_WAIT / $retryInterval) . ";
+		// Live elapsed timers
+		setInterval(function(){
+			document.querySelectorAll('.mq-elapsed').forEach(function(el){
+				var s=Math.floor(Date.now()/1000)-parseInt(el.dataset.start,10);
+				var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+				el.textContent=(h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+			});
+		},1000);
+		function fmtBytes(b){ if(!b||b<=0) return '—'; var u=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(1024)); return (b/Math.pow(1024,i)).toFixed(1)+' '+u[i]; }
 		function mqCheck(){
 			mqRetries++;
 			if(mqRetries>=mqMax){ document.getElementById('mq_status').innerHTML='<b>Timeout.</b> <a href=\"#\" onclick=\"document.mega_queue_form.submit();return false;\">Click to retry</a>'; return; }
@@ -172,18 +194,26 @@ class mega_co_nz extends DownloadClass {
 			xhr.open('GET','ajax.php?ajax=mega_queue_check&t='+Date.now(),true);
 			xhr.onreadystatechange=function(){
 				if(xhr.readyState!=4) return;
-				if(xhr.status==200){
-					try{ var d=JSON.parse(xhr.responseText); } catch(e){ setTimeout(mqCheck," . ($retryInterval * 1000) . "); return; }
-					if(d.status==='free'){ document.getElementById('mq_status').innerHTML='<b style=\"color:#22c55e;\">✅ Slot is free! Starting your download…</b>'; document.mega_queue_form.submit(); return; }
-					if(d.filename){ document.getElementById('mq_filename').textContent=d.filename; }
-					if(d.size){ document.getElementById('mq_size').textContent=formatBytes(d.size); }
-					document.getElementById('mq_status').textContent='Waiting… attempt '+mqRetries+'/'+mqMax+' — next check in {$retryInterval}s';
+				var d=null;
+				try{ d=JSON.parse(xhr.responseText); }catch(e){}
+				if(d && d.status==='free'){
+					document.getElementById('mq_status').innerHTML='<b style=\"color:#22c55e;\">✅ Slot free! Starting download…</b>';
+					document.mega_queue_form.submit(); return;
 				}
+				if(d && d.downloads){
+					d.downloads.forEach(function(dl,i){
+						var card=document.querySelector('.mq-card[data-slot=\"'+i+'\"]');
+						if(!card) return;
+						if(dl.filename) card.querySelector('.mq-fname').textContent=dl.filename;
+						if(dl.size)     card.querySelector('.mq-size').textContent=fmtBytes(dl.size);
+						if(dl.start_time) card.querySelector('.mq-elapsed').dataset.start=dl.start_time;
+					});
+				}
+				document.getElementById('mq_status').textContent='Waiting… check '+mqRetries+'/'+mqMax+' — next in {$retryInterval}s';
 				setTimeout(mqCheck," . ($retryInterval * 1000) . ");
 			};
 			xhr.send();
 		}
-		function formatBytes(b){ if(!b||b<=0) return '—'; var u=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(1024)); return (b/Math.pow(1024,i)).toFixed(1)+' '+u[i]; }
 		setTimeout(mqCheck," . ($retryInterval * 1000) . ");
 		</script>";
 
@@ -192,37 +222,29 @@ class mega_co_nz extends DownloadClass {
 	}
 
 	public function updateMegaLock($filename, $size = 0) {
-		$lockFile = DOWNLOAD_DIR . '.mega_lock';
-		if (!file_exists($lockFile)) return;
-		$lockData = @json_decode(@file_get_contents($lockFile), true);
-		if ($lockData && $lockData['pid'] == getmypid()) {
-			$lockData['filename'] = basename($filename);
-			$lockData['size'] = $size;
-			$lockData['time'] = time();
-			@file_put_contents($lockFile, json_encode($lockData), LOCK_EX);
+		if (empty($this->mySlotFile) || !file_exists($this->mySlotFile)) return;
+		$d = @json_decode(@file_get_contents($this->mySlotFile), true);
+		if ($d && $d['pid'] == getmypid()) {
+			$d['filename'] = basename($filename);
+			$d['size'] = $size;
+			$d['time'] = time();
+			@file_put_contents($this->mySlotFile, json_encode($d), LOCK_EX);
 		}
 	}
 
 	public function releaseMegaLock() {
-		$lockFile = DOWNLOAD_DIR . '.mega_lock';
-		if (file_exists($lockFile)) {
-			$lockData = @json_decode(@file_get_contents($lockFile), true);
-			// Only remove if it's our lock
-			if (!$lockData || $lockData['pid'] == getmypid()) {
-				@unlink($lockFile);
-			}
+		if (!empty($this->mySlotFile) && file_exists($this->mySlotFile)) {
+			$d = @json_decode(@file_get_contents($this->mySlotFile), true);
+			if (!$d || $d['pid'] == getmypid()) @unlink($this->mySlotFile);
 		}
 	}
 
-	// Keep the lock file timestamp fresh during download
 	public function touchMegaLock() {
-		$lockFile = DOWNLOAD_DIR . '.mega_lock';
-		if (file_exists($lockFile)) {
-			$lockData = @json_decode(@file_get_contents($lockFile), true);
-			if ($lockData && $lockData['pid'] == getmypid()) {
-				$lockData['time'] = time();
-				@file_put_contents($lockFile, json_encode($lockData), LOCK_EX);
-			}
+		if (empty($this->mySlotFile) || !file_exists($this->mySlotFile)) return;
+		$d = @json_decode(@file_get_contents($this->mySlotFile), true);
+		if ($d && $d['pid'] == getmypid()) {
+			$d['time'] = time();
+			@file_put_contents($this->mySlotFile, json_encode($d), LOCK_EX);
 		}
 	}
 
@@ -282,9 +304,16 @@ class mega_co_nz extends DownloadClass {
 		if (!function_exists('json_encode')) html_error('Error: Please enable JSON in php.');
 		$page = $this->GetPage('https://g.api.mega.co.nz/cs?id=' . ($this->seqno++) . (!empty($node) ? "&n=$node" : '') . (!empty($this->cookie['sid']) ? "&sid={$this->cookie['sid']}" : ''), 0, json_encode((!empty($atrr[0]) && is_array($atrr[0])) ? $atrr : array($atrr)), "https://mega.nz/\r\nContent-Type: application/json");
 		if (in_array(intval(substr($page, 9, 3)), array(500, 503))) return array(-3); //  500 Server Too Busy
-		list ($header, $page) = array_map('trim', explode("\r\n\r\n", $page, 2));
-		if (is_numeric($page)) return array(intval($page));
-		return $this->json2array($page);
+		// Split headers from body; fall back gracefully if separator is absent
+		$parts = explode("\r\n\r\n", $page, 2);
+		$body  = isset($parts[1]) ? trim($parts[1]) : '';
+		if ($body === '') {
+			// Try \n\n separator (HTTP/2 or unusual servers)
+			$parts2 = explode("\n\n", $page, 2);
+			$body = isset($parts2[1]) ? trim($parts2[1]) : trim($page);
+		}
+		if (is_numeric($body)) return array(intval($body));
+		return $this->json2array($body);
 	}
 
 	private function str_to_a32($b) {
