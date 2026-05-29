@@ -6,12 +6,39 @@ if (!defined('RAPIDLEECH')) {
 // Using functions from: http://julien-marchand.fr/blog/using-the-mega-api-with-php-examples/
 class mega_co_nz extends DownloadClass {
 	private $useOpenSSL, $useOldFilter, $seqno, $cookie, $mySlotFile = '';
+	private $megaDebugInit = false;
+
+	private function megaLog($msg, $level = 'INFO') {
+		$ts    = date('H:i:s');
+		$color = ($level === 'ERROR') ? '#f87171' : (($level === 'WARN') ? '#fbbf24' : (($level === 'OK') ? '#4ade80' : '#94a3b8'));
+		$safe  = htmlspecialchars($msg, ENT_QUOTES | ENT_SUBSTITUTE);
+		if (!$this->megaDebugInit) {
+			echo '<div id="mega-debug" style="margin:10px 0;background:#0d1117;border:1px solid #30363d;border-radius:8px;overflow:hidden;">'
+				. '<div style="padding:6px 12px;background:#161b22;font-size:11px;font-family:monospace;color:#8b949e;display:flex;justify-content:space-between;align-items:center;">'
+				. '<span>Mega Debug Log</span>'
+				. '<button onclick="var el=document.getElementById(\'mega-log\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" '
+				. 'style="background:none;border:1px solid #30363d;color:#8b949e;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">toggle</button>'
+				. '</div>'
+				. '<pre id="mega-log" style="margin:0;padding:10px 12px;font-size:12px;font-family:monospace;max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></pre>'
+				. '</div>';
+			flush();
+			$this->megaDebugInit = true;
+		}
+		$jsMsg = addslashes($safe);
+		echo "<script>!function(){var p=document.getElementById('mega-log');if(!p)return;"
+			. "p.innerHTML+='<span style=\"color:#8b949e\">[{$ts}]</span> <span style=\"color:{$color};font-weight:600\">[{$level}]</span> {$jsMsg}\\n';"
+			. "p.scrollTop=p.scrollHeight;}();</script>\n";
+		flush();
+		if (function_exists('rl_log')) rl_log($level === 'OK' ? 'INFO' : $level, '[Mega] ' . $msg);
+	}
+
 	public function Download($link) {
 		$this->checkCryptDependences();
 		$this->checkMegaQueue($link);
 
 		$this->seqno = mt_rand();
 		$this->changeMesg(lang(300).'<br />Mega.nz plugin');
+		$this->megaLog('Starting download for: ' . htmlspecialchars($link, ENT_QUOTES));
 
 		// New format: mega.nz/folder/ID#KEY or mega.nz/folder/ID#KEY/subfolder/SUBID
 		if (preg_match('@mega\.(?:nz|co\.nz)/folder/([^#]{8})[#!]([\w\-\,]{22})(?:/folder/([^#]{8}))?(!less$)?@i', $link, $fid)) {
@@ -25,10 +52,13 @@ class mega_co_nz extends DownloadClass {
 		// New format: mega.nz/file/ID#KEY
 		if (preg_match('@mega\.(?:nz|co\.nz)/file/([^#]{8})[#!]([\w\-\,]{43})@i', $link, $fid)) {
 			$fid = array($link, '', $fid[1], $fid[2]);
+			$this->megaLog('Parsed file ID: ' . $fid[2]);
 		}
 		// Old format: mega.nz/#!ID!KEY or mega.nz/#N!ID!KEY
 		elseif (!preg_match('@(T8|N)?!?([^!]{8})[!#]([\w\-\,]{43})(?:(?:!|=###n=)([^!#]{8})(?:!|$))?@i', $link, $fid)) {
 			html_error('FileID or Key not found at link. Supported formats:<br>mega.nz/file/ID#KEY<br>mega.nz/folder/ID#KEY<br>mega.nz/#!ID!KEY');
+		} else {
+			$this->megaLog('Parsed file ID (legacy format): ' . $fid[2]);
 		}
 
 		// Load premium account credentials if available
@@ -48,17 +78,31 @@ class mega_co_nz extends DownloadClass {
 			$pass = $GLOBALS['premium_acc']['mega_co_nz']['pass'];
 		}
 
-		// If we have credentials, login FIRST before requesting download link
-		if (!empty($user) && !empty($pass) && empty($this->cookie['sid'])) {
-			$this->cJar_load($user, $pass);
+		if (!empty($user)) {
+			$this->megaLog('Using account: ' . substr($user, 0, 3) . '***@' . substr(strrchr($user, '@'), 1));
+		} else {
+			$this->megaLog('No account configured — anonymous download (quota limits apply)', 'WARN');
 		}
 
+		// If we have credentials, login FIRST before requesting download link
+		if (!empty($user) && !empty($pass) && empty($this->cookie['sid'])) {
+			$this->megaLog('Logging in to Mega…');
+			$this->cJar_load($user, $pass);
+			$this->megaLog('Login ' . (!empty($this->cookie['sid']) ? 'OK — session active' : 'failed — no session'), (!empty($this->cookie['sid']) ? 'OK' : 'WARN'));
+		} elseif (!empty($this->cookie['sid'])) {
+			$this->megaLog('Reusing existing session', 'OK');
+		}
+
+		$this->megaLog('Requesting download URL from Mega API…');
 		$reply = $this->apiReq(array('a' => 'g', 'g' => 1, (empty($fid[1]) ? 'p' : 'n') => $fid[2], 'ssl' => 0), (!empty($fid[1]) && !empty($fid[4]) ? $fid[4] : ''));
 		if (is_numeric($reply[0])) $this->CheckErr($reply[0]);
 		if (!empty($reply[0]['e']) && is_numeric($reply[0]['e'])) $this->CheckErr($reply[0]['e']);
+
+		$this->megaLog('API reply OK — checking traffic quota…');
 		$tLimit = $this->checkTrafficLimit($reply[0]['g']);
 
 		if ($tLimit) {
+			$this->megaLog('Transfer quota exceeded!', 'ERROR');
 			$debugInfo = '';
 			if (!empty($user)) $debugInfo .= '<br>Account: ' . htmlspecialchars(substr($user, 0, 3)) . '***';
 			if (!empty($this->cookie['sid'])) $debugInfo .= '<br>Session: Active (logged in)';
@@ -68,13 +112,17 @@ class mega_co_nz extends DownloadClass {
 			else html_error('Transfer Quota Exceeded even with Premium account. Your Mega plan quota may be used up.' . $debugInfo);
 		}
 
+		$this->megaLog('Quota OK — decrypting file attributes…');
 		$key = $this->base64_to_a32($fid[3]);
 		$key = array($key[0] ^ $key[4], $key[1] ^ $key[5], $key[2] ^ $key[6], $key[3] ^ $key[7]);
 		$attr = $this->dec_attr($this->base64url_decode($reply[0]['at']), $key);
 		if (empty($attr)) html_error((!empty($fid[1]) ? 'Folder Error: ' : '').'File\'s key isn\'t correct.');
 
-		$this->updateMegaLock($attr['n'], !empty($reply[0]['s']) ? (int)$reply[0]['s'] : 0);
+		$fileSize = !empty($reply[0]['s']) ? (int)$reply[0]['s'] : 0;
+		$this->megaLog('File: ' . $attr['n'] . ' (' . ($fileSize > 0 ? bytesToKbOrMbOrGb($fileSize) : 'unknown size') . ')', 'OK');
+		$this->updateMegaLock($attr['n'], $fileSize);
 
+		$this->megaLog('Starting download stream…');
 		$this->RedirectDownload($reply[0]['g'], $attr['n'], 0, 0, $link, 0, 0, array('T8[fkey]' => $fid[3]));
 	}
 
@@ -313,6 +361,12 @@ class mega_co_nz extends DownloadClass {
 			$body = isset($parts2[1]) ? trim($parts2[1]) : trim($page);
 		}
 		if (is_numeric($body)) return array(intval($body));
+		// Detect non-JSON response before json2array() throws "No content" / "JSON start braces not found"
+		if ($body === '') {
+			$this->megaLog('API returned empty body — possible network/proxy issue. Raw: ' . htmlspecialchars(substr($page, 0, 300), ENT_QUOTES), 'ERROR');
+		} elseif ($body[0] !== '[' && $body[0] !== '{') {
+			$this->megaLog('API returned non-JSON body — possible rate-limit or server error. Preview: ' . htmlspecialchars(substr($body, 0, 300), ENT_QUOTES), 'ERROR');
+		}
 		return $this->json2array($body);
 	}
 
