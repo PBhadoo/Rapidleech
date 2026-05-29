@@ -612,13 +612,20 @@ switch ($_GET['ajax']) {
 	case 'mega_queue_check':
 		if (!defined('DOWNLOAD_DIR')) define('DOWNLOAD_DIR', $options['download_dir']);
 		header('Content-Type: application/json');
-		$staleTimeout = 1800;
+		$staleTimeout = 600; // matches MEGA_STALE_SECS in the plugin
 		$maxSlots = 5;
 		$activeDownloads = array();
 		foreach (glob(DOWNLOAD_DIR . '.mega_slot_*') ?: array() as $slotFile) {
 			$d = @json_decode(@file_get_contents($slotFile), true);
-			$age = time() - (!empty($d['start_time']) ? $d['start_time'] : 0);
-			if (!$d || $age > $staleTimeout) { @unlink($slotFile); continue; }
+			if (!$d) { @unlink($slotFile); continue; }
+			// Use 'time' (last activity) for staleness — same logic as plugin's megaActiveSlots()
+			$lastActivity = !empty($d['time']) ? $d['time'] : (!empty($d['start_time']) ? $d['start_time'] : 0);
+			if (time() - $lastActivity > $staleTimeout) {
+				if (!empty($d['pid']) && function_exists('posix_kill')) @posix_kill((int)$d['pid'], SIGTERM);
+				@unlink($slotFile);
+				continue;
+			}
+			$age = time() - (!empty($d['start_time']) ? $d['start_time'] : time());
 			$activeDownloads[] = array(
 				'filename'   => !empty($d['filename']) ? $d['filename'] : '',
 				'size'       => !empty($d['size']) ? $d['size'] : 0,

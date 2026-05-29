@@ -145,8 +145,25 @@ if (isset($_GET['get_pending'])) {
         }
     }
 
-    // Mega lock
+    // Mega slots (new per-download slot files)
     $dlDir = admin_dl_dir($rootDir, $options);
+    $staleTimeout = 600;
+    $result['mega_slots'] = array();
+    foreach (glob($dlDir . '.mega_slot_*') ?: array() as $slotFile) {
+        $d = @json_decode(@file_get_contents($slotFile), true);
+        if (!$d) { @unlink($slotFile); continue; }
+        $lastActivity = !empty($d['time']) ? $d['time'] : (!empty($d['start_time']) ? $d['start_time'] : 0);
+        $isStale = (time() - $lastActivity > $staleTimeout);
+        $result['mega_slots'][] = array(
+            'pid'      => $d['pid'] ?? 0,
+            'filename' => $d['filename'] ?? '',
+            'link'     => $d['link'] ?? '',
+            'elapsed'  => time() - (!empty($d['start_time']) ? $d['start_time'] : time()),
+            'stale'    => $isStale,
+        );
+    }
+
+    // Legacy single mega lock (kept for backward compat display)
     $megaLock = $dlDir . '.mega_lock';
     if (file_exists($megaLock)) {
         $ld = @json_decode(@file_get_contents($megaLock), true);
@@ -188,6 +205,20 @@ if (isset($_GET['clear_mega_lock'])) {
     } else {
         echo json_encode(array('success' => false, 'error' => 'Lock file not found'));
     }
+    exit;
+}
+
+// AJAX: clear all mega slot files (and kill their processes)
+if (isset($_GET['clear_mega_slots'])) {
+    header('Content-Type: application/json');
+    $dlDir = admin_dl_dir($rootDir, $options);
+    $deleted = 0;
+    foreach (glob($dlDir . '.mega_slot_*') ?: array() as $f) {
+        $d = @json_decode(@file_get_contents($f), true);
+        if ($d && !empty($d['pid']) && function_exists('posix_kill')) @posix_kill((int)$d['pid'], SIGTERM);
+        if (@unlink($f)) $deleted++;
+    }
+    echo json_encode(array('success' => true, 'deleted' => $deleted));
     exit;
 }
 
@@ -573,13 +604,23 @@ label.check input{accent-color:#6366f1}
         <div id="pending-list">
             <div style="color:#606880;font-size:13px;text-align:center;padding:20px">Loading...</div>
         </div>
-        <div id="mega-lock-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #282d3e">
+        <div id="mega-slots-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #282d3e">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
                 <div>
-                    <span style="color:#f59e0b;font-weight:600">🔒 Mega Lock Active</span>
+                    <span style="color:#f59e0b;font-weight:600">🔒 Mega Slots</span>
+                    <span id="mega-slots-info" style="color:#a0a8c0;font-size:13px;margin-left:8px"></span>
+                </div>
+                <button onclick="clearMegaSlots()" class="btn btn-warning" style="padding:6px 14px;font-size:12px">🔓 Release All Slots</button>
+            </div>
+            <div id="mega-slots-list" style="margin-top:8px;font-size:12px;color:#a0a8c0"></div>
+        </div>
+        <div id="mega-lock-section" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #282d3e">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                <div>
+                    <span style="color:#f59e0b;font-weight:600">🔒 Legacy Mega Lock</span>
                     <span id="mega-lock-info" style="color:#a0a8c0;font-size:13px;margin-left:8px"></span>
                 </div>
-                <button onclick="clearMegaLock()" class="btn btn-warning" style="padding:6px 14px;font-size:12px">🔓 Release Mega Lock</button>
+                <button onclick="clearMegaLock()" class="btn btn-warning" style="padding:6px 14px;font-size:12px">🔓 Release Lock</button>
             </div>
         </div>
     </div>
@@ -921,7 +962,25 @@ function loadPending(){
         list.innerHTML=rows;
         document.getElementById('active-count').textContent='('+(data.downloads.length+data.queue.length)+' active)';
 
-        // Mega lock
+        // Mega slots
+        var slotsSec=document.getElementById('mega-slots-section');
+        if(data.mega_slots && data.mega_slots.length>0){
+            slotsSec.style.display='block';
+            var staleCount=data.mega_slots.filter(function(s){return s.stale;}).length;
+            document.getElementById('mega-slots-info').textContent=
+                data.mega_slots.length+'/5 occupied'+(staleCount?' · '+staleCount+' stale':'');
+            var slotRows='';
+            data.mega_slots.forEach(function(s,i){
+                var label=s.filename||escHtml(s.link.substr(0,40))+'…';
+                var staleTag=s.stale?' <span style="color:#ef4444;font-weight:600">[STALE]</span>':'';
+                slotRows+='<div style="padding:2px 0">Slot '+(i+1)+': '+escHtml(label)+' · '+fmtSeconds(s.elapsed)+staleTag+'</div>';
+            });
+            document.getElementById('mega-slots-list').innerHTML=slotRows;
+        } else {
+            slotsSec.style.display='none';
+        }
+
+        // Legacy mega lock
         var lockSec=document.getElementById('mega-lock-section');
         if(data.mega_lock){
             lockSec.style.display='block';
@@ -941,8 +1000,15 @@ function killPid(pid){
     });
 }
 
+function clearMegaSlots(){
+    if(!confirm('Release all Mega slots and terminate stuck processes? Do this only if downloads are stuck.')) return;
+    fetch(_adminPath+'?clear_mega_slots=1').then(r=>r.json()).then(function(d){
+        if(d.success){loadPending();}else{alert('Failed: '+(d.error||'unknown error'));}
+    });
+}
+
 function clearMegaLock(){
-    if(!confirm('Release the Mega lock? Only do this if the download is stuck or crashed.')) return;
+    if(!confirm('Release the legacy Mega lock? Only do this if the download is stuck or crashed.')) return;
     fetch(_adminPath+'?clear_mega_lock=1').then(r=>r.json()).then(function(d){
         if(d.success){loadPending();}else{alert('Failed: '+(d.error||'unknown error'));}
     });

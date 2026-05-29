@@ -175,7 +175,11 @@ class mega_co_nz extends DownloadClass {
 			// Use 'time' (last activity) for staleness — gets touched every 30s during download.
 			// Fall back to 'start_time' for slots that haven't started downloading yet.
 			$lastActivity = !empty($d['time']) ? $d['time'] : (!empty($d['start_time']) ? $d['start_time'] : 0);
-			if (time() - $lastActivity > self::MEGA_STALE_SECS) { @unlink($f); continue; }
+			if (time() - $lastActivity > self::MEGA_STALE_SECS) {
+				if (!empty($d['pid']) && function_exists('posix_kill')) @posix_kill((int)$d['pid'], SIGTERM);
+				@unlink($f);
+				continue;
+			}
 			$active[] = array('file' => $f, 'data' => $d);
 		}
 		return $active;
