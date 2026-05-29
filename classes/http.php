@@ -1338,28 +1338,34 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
     
     // Close all handles and file pointers
     $allSuccess = true;
+    $count416 = 0;
     if (function_exists('rl_log')) rl_log('INFO', 'Parallel download chunks finished, checking results', array('filename' => $FileName, 'chunks' => $numChunks));
     foreach ($handles as $i => $ch) {
         $info = curl_getinfo($ch);
         $httpCode = $info['http_code'];
         $downloaded = $info['size_download'];
         $curlError = curl_error($ch);
-        
+
         flock($fileHandles[$i], LOCK_UN);
         fclose($fileHandles[$i]);
-        
+
         curl_multi_remove_handle($mh, $ch);
         curl_close($ch);
-        
+
         // Check if chunk downloaded successfully
         if ($httpCode < 200 || $httpCode >= 400 || $downloaded < $chunks[$i]['size'] * 0.95) {
             $allSuccess = false;
-            if (function_exists('rl_log')) rl_log('ERROR', 'Chunk failed', array('chunk' => $i, 'http_code' => $httpCode, 'downloaded' => $downloaded, 'expected' => $chunks[$i]['size'], 'curl_error' => $curlError));
+            if ($httpCode == 416) {
+                $count416++;
+                if (function_exists('rl_log')) rl_log('WARN', 'Chunk rejected range request (HTTP 416) — server does not support this byte range', array('chunk' => $i, 'http_code' => 416, 'downloaded' => $downloaded, 'expected' => $chunks[$i]['size']));
+            } else {
+                if (function_exists('rl_log')) rl_log('ERROR', 'Chunk failed', array('chunk' => $i, 'http_code' => $httpCode, 'downloaded' => $downloaded, 'expected' => $chunks[$i]['size'], 'curl_error' => $curlError));
+            }
         }
         $chunks[$i]['downloaded'] = $downloaded;
     }
     curl_multi_close($mh);
-    
+
     if (!$allSuccess) {
         // Cleanup chunk files and metadata
         foreach ($chunks as $chunk) {
@@ -1369,6 +1375,9 @@ function parallelDownload($url, $saveToFile, $fileSize, $numChunks = 8, $cookie 
         }
         if (isset($metaFile) && file_exists($metaFile)) {
             @unlink($metaFile);
+        }
+        if ($count416 > 0 && function_exists('rl_log')) {
+            rl_log('WARN', 'Parallel download failed: ' . $count416 . '/' . $numChunks . ' chunks got HTTP 416 (server rejected range requests) — retrying as single-stream', array('filename' => $FileName, 'url' => $url));
         }
         $lastError = lang(106);
         return false;
