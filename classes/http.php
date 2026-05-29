@@ -483,6 +483,17 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 				if (!empty($GLOBALS['current_download_id']) && function_exists('update_download_progress')) {
 					update_download_progress($GLOBALS['current_download_id'], $bytesReceived + $Resume['from'], $bytesTotal + $Resume['from']);
 				}
+				// Touch Mega slot file every 30s so staleness check sees it as active.
+				if (!empty($_GET['T8']['megaSlot'])) {
+					static $lastMegaSlotTouch = 0;
+					$_now = time();
+					if ($_now - $lastMegaSlotTouch >= 30) {
+						$_sp = (defined('DOWNLOAD_DIR') ? DOWNLOAD_DIR : 'files/') . basename($_GET['T8']['megaSlot']);
+						$_sd = @json_decode(@file_get_contents($_sp), true);
+						if ($_sd) { $_sd['time'] = $_now; @file_put_contents($_sp, json_encode($_sd), LOCK_EX); }
+						$lastMegaSlotTouch = $_now;
+					}
+				}
 			}
 		} while (!feof($fp));
 

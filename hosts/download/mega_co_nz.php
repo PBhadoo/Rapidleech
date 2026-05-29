@@ -123,7 +123,14 @@ class mega_co_nz extends DownloadClass {
 		$this->updateMegaLock($attr['n'], $fileSize);
 
 		$this->megaLog('Starting download stream…');
-		$this->RedirectDownload($reply[0]['g'], $attr['n'], 0, 0, $link, 0, 0, array('T8[fkey]' => $fid[3]));
+		// Hand the slot to the second request so it stays alive during the actual download.
+		// Clear $this->mySlotFile so the shutdown function skips cleanup on this happy-path exit.
+		$slotBase = !empty($this->mySlotFile) ? basename($this->mySlotFile) : '';
+		$this->mySlotFile = '';
+		$this->RedirectDownload($reply[0]['g'], $attr['n'], 0, 0, $link, 0, 0, array(
+			'T8[fkey]'     => $fid[3],
+			'T8[megaSlot]' => $slotBase,
+		));
 	}
 
 	private function checkBug78902($link = '') {
@@ -151,7 +158,7 @@ class mega_co_nz extends DownloadClass {
 	// Each download claims one slot file: .mega_slot_{pid}
 	// ============================================
 	const MEGA_MAX_SLOTS   = 5;
-	const MEGA_STALE_SECS  = 1800; // 30 min — consider slot abandoned
+	const MEGA_STALE_SECS  = 600;  // 10 min no activity → slot abandoned (download touches it every 30s)
 	const MEGA_MAX_WAIT    = 600;  // 10 min — queue page timeout
 	const MEGA_RETRY_SECS  = 5;
 
@@ -163,8 +170,11 @@ class mega_co_nz extends DownloadClass {
 		$active = array();
 		foreach ($this->megaSlotFiles() as $f) {
 			$d = @json_decode(@file_get_contents($f), true);
-			$age = time() - (!empty($d['start_time']) ? $d['start_time'] : 0);
-			if (!$d || $age > self::MEGA_STALE_SECS) { @unlink($f); continue; }
+			if (!$d) { @unlink($f); continue; }
+			// Use 'time' (last activity) for staleness — gets touched every 30s during download.
+			// Fall back to 'start_time' for slots that haven't started downloading yet.
+			$lastActivity = !empty($d['time']) ? $d['time'] : (!empty($d['start_time']) ? $d['start_time'] : 0);
+			if (time() - $lastActivity > self::MEGA_STALE_SECS) { @unlink($f); continue; }
 			$active[] = array('file' => $f, 'data' => $d);
 		}
 		return $active;
@@ -185,6 +195,9 @@ class mega_co_nz extends DownloadClass {
 				'start_time' => time(),
 				'link'       => $link,
 			)), LOCK_EX);
+			// Only release via shutdown on error paths (html_error, exception).
+			// On the happy path (RedirectDownload), we clear $this->mySlotFile before
+			// the redirect so this shutdown does nothing — the second request owns the slot.
 			register_shutdown_function(array($this, 'releaseMegaLock'));
 			return; // slot acquired — proceed with download
 		}

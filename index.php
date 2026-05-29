@@ -267,11 +267,15 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		// Register download for tracking
 		$GLOBALS['current_download_id'] = generate_download_id();
 		register_download($GLOBALS['current_download_id'], $_GET['link'], basename($_GET['filename']), 0);
-		// Safety net: clean up tracker if html_error()/exit() fires mid-stream
+		// Safety net: clean up tracker + Mega slot if html_error()/exit() fires mid-stream
 		register_shutdown_function(function() {
 			if (!empty($GLOBALS['current_download_id'])) {
 				complete_download($GLOBALS['current_download_id']);
 				$GLOBALS['current_download_id'] = '';
+			}
+			if (!empty($_GET['T8']['megaSlot'])) {
+				$_slotPath = (defined('DOWNLOAD_DIR') ? DOWNLOAD_DIR : 'files/') . basename($_GET['T8']['megaSlot']);
+				if (file_exists($_slotPath)) @unlink($_slotPath);
 			}
 		});
 		
@@ -289,10 +293,15 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 			$file = geturl($_GET['host'], defport($url), $_GET['path'], $_GET['referer'], $_GET['cookie'], $_GET['post'], $pathWithName, $_GET['proxy'], $pauth, $auth, $url['scheme']);
 		}
 		
-		// Mark download as complete
+		// Mark download as complete and release Mega slot if present
 		if (!empty($GLOBALS['current_download_id'])) {
 			complete_download($GLOBALS['current_download_id']);
 			$GLOBALS['current_download_id'] = '';
+		}
+		if (!empty($_GET['T8']['megaSlot'])) {
+			$_slotPath = DOWNLOAD_DIR . basename($_GET['T8']['megaSlot']);
+			if (file_exists($_slotPath)) @unlink($_slotPath);
+			$_GET['T8']['megaSlot'] = ''; // prevent double-delete in shutdown
 		}
 
 		if ($options['redir'] && $lastError && strpos($lastError, substr(lang(95), 0, strpos(lang(95), '%1$s'))) !== false) {
