@@ -96,57 +96,57 @@ function geturl($host, $port, $url, $referer = 0, $cookie = 0, $post = 0, $saveT
 	// Try parallel download for file downloads (when saveToFile is provided)
 	// Only use parallel when: no POST data, no resume in progress, file is large enough, cURL available
 	if ($saveToFile && $post === 0 && empty($Resume['use']) && extension_loaded('curl') && function_exists('curl_multi_init')) {
-		// Build full URL
-		$fullScheme = ($scheme == 'ssl://') ? 'https://' : (($scheme == 'https://') ? 'https://' : 'http://');
-		$fullUrl = $fullScheme . $host . ($port != 0 && $port != 80 && $port != 443 ? ':' . $port : '') . $url;
-		
-		// Check if URL supports resume
-		$cookieStr = '';
-		if (!empty($cookie)) {
-			$cookieStr = is_array($cookie) ? CookiesToStr($cookie) : trim($cookie);
-		}
-		
-		$resumeInfo = checkResumeSupport($fullUrl, $cookieStr, $referer, $proxy, $pauth, $auth);
-		
-		// Use parallel download if:
-		// 1. Resume is supported
-		// 2. File size is known and > 2MB (worth parallelizing)
-		// 3. parallel_download option is not disabled
-		$minSizeForParallel = 2 * 1024 * 1024; // 2MB minimum
-		$useParallel = !empty($options['parallel_download']) || !isset($options['parallel_download']); // Default enabled
 		// Hosts matched by a plugin use CheckBack() for post-processing (e.g. Mega decryption).
 		// CheckBack() attaches a PHP stream filter which cURL-based parallel download cannot use.
 		// Skip parallel for these hosts so single-stream triggers CheckBack correctly.
+		// Check this first to avoid a wasted HEAD request via checkResumeSupport().
+		$useParallel = !empty($options['parallel_download']) || !isset($options['parallel_download']); // Default enabled
 		if ($useParallel && !empty($GLOBALS['host'])) {
 			foreach ($GLOBALS['host'] as $_site => $_file) {
 				if (host_matches($_site, $host)) { $useParallel = false; break; }
 			}
 		}
 
-		if ($resumeInfo && $resumeInfo['supports_resume'] && $resumeInfo['content_length'] > $minSizeForParallel && $useParallel) {
-			// Check file size limit
-			if ($options['file_size_limit'] > 0 && ($resumeInfo['content_length'] > ($options['file_size_limit'] * 1024 * 1024))) {
-				$lastError = lang(336) . bytesToKbOrMbOrGb($options['file_size_limit'] * 1024 * 1024) . '.';
-				return false;
+		if ($useParallel) {
+			// Build full URL
+			$fullScheme = ($scheme == 'ssl://') ? 'https://' : (($scheme == 'https://') ? 'https://' : 'http://');
+			$fullUrl = $fullScheme . $host . ($port != 0 && $port != 80 && $port != 443 ? ':' . $port : '') . $url;
+
+			// Check if URL supports resume
+			$cookieStr = '';
+			if (!empty($cookie)) {
+				$cookieStr = is_array($cookie) ? CookiesToStr($cookie) : trim($cookie);
 			}
-			
-			if ($proxy) echo '<p>' . sprintf(lang(89), $proxy, '') . '<br />GET: <b>' . htmlspecialchars($fullUrl) . "</b>...<br />\n";
-			else echo '<p>'.sprintf(lang(90), $host, $port).'</p>';
-			
-			// Use filename from headers if available
-			if (!empty($resumeInfo['filename']) && empty($force_name)) {
-				$force_name = $resumeInfo['filename'];
+
+			$resumeInfo = checkResumeSupport($fullUrl, $cookieStr, $referer, $proxy, $pauth, $auth);
+
+			$minSizeForParallel = 2 * 1024 * 1024; // 2MB minimum
+
+			if ($resumeInfo && $resumeInfo['supports_resume'] && $resumeInfo['content_length'] > $minSizeForParallel) {
+				// Check file size limit
+				if ($options['file_size_limit'] > 0 && ($resumeInfo['content_length'] > ($options['file_size_limit'] * 1024 * 1024))) {
+					$lastError = lang(336) . bytesToKbOrMbOrGb($options['file_size_limit'] * 1024 * 1024) . '.';
+					return false;
+				}
+
+				if ($proxy) echo '<p>' . sprintf(lang(89), $proxy, '') . '<br />GET: <b>' . htmlspecialchars($fullUrl) . "</b>...<br />\n";
+				else echo '<p>'.sprintf(lang(90), $host, $port).'</p>';
+
+				// Use filename from headers if available
+				if (!empty($resumeInfo['filename']) && empty($force_name)) {
+					$force_name = $resumeInfo['filename'];
+				}
+
+				$numChunks = isset($options['parallel_chunks']) ? (int)$options['parallel_chunks'] : 8;
+				$result = parallelDownload($fullUrl, $saveToFile, $resumeInfo['content_length'], $numChunks, $cookieStr, $referer, $proxy, $pauth, $auth);
+
+				if ($result !== false) {
+					return $result;
+				}
+				// If parallel download failed, fall through to single-stream download
 			}
-			
-			$numChunks = isset($options['parallel_chunks']) ? (int)$options['parallel_chunks'] : 8;
-			$result = parallelDownload($fullUrl, $saveToFile, $resumeInfo['content_length'], $numChunks, $cookieStr, $referer, $proxy, $pauth, $auth);
-			
-			if ($result !== false) {
-				return $result;
-			}
-			// If parallel download failed, fall through to single-stream download
-		}
-	}
+		} // end if ($useParallel)
+	} // end if ($saveToFile && parallel-capable)
 
 	if (($post !== 0) && ($scheme == 'http://' || $scheme == 'https://')) {
 		$method = 'POST';
