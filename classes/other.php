@@ -288,7 +288,7 @@ function fixfilename($fname, $fpach = '') {
 	$f_dir = ($f_dir == '.') ? '' : $f_dir;
 	$f_dir = preg_replace('@\.\./@i', '', $f_dir);
 	$fpach = preg_replace('@\.\./@i', '', $fpach);
-	$f_name = preg_replace('@\.(((s|\d)?php)|(hta)|(p[l|y])|(cgi)|(sph))@i', '.xxx', $f_name);
+	$f_name = preg_replace('@\.(php\d*|phtml|pht|phar|phps|sph|hta|htaccess|pl|py|cgi|shtml|module|inc|sh|bash|exe|bat|cmd|com|msi|vbs|vbe|js|jse|wsf|wsh|ps1|psm1|psd1)@i', '.xxx', $f_name);
 	$ret = ($fpach) ? $fpach . DIRECTORY_SEPARATOR . $f_name : ($f_dir ? $f_dir . DIRECTORY_SEPARATOR : '') . $f_name;
 	return $ret;
 }

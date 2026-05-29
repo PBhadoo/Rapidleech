@@ -9,6 +9,22 @@ require_once(CLASS_DIR . 'other.php');
 define ( 'TEMPLATE_DIR', 'templates/'.$options['template_used'].'/' );
 $nn = "\r\n";
 
+// Apply the same login gate as the main entry points
+if (!empty($options['login'])) {
+    $ajax_action = $_GET['ajax'] ?? '';
+    // Allow public-safe read-only status checks without auth
+    $public_ajax = array('pending_downloads', 'server_stats', 'mega_queue_check');
+    if (!in_array($ajax_action, $public_ajax, true)) {
+        if (empty($_SESSION)) @session_start();
+        if (empty($_SESSION['rl_logged_in'])) {
+            header('Content-Type: application/json');
+            http_response_code(401);
+            echo json_encode(array('error' => 'Not authenticated'));
+            exit;
+        }
+    }
+}
+
 // Polyfill for PHP < 8.0
 if (!function_exists('str_ends_with')) {
     function str_ends_with($haystack, $needle) {
@@ -437,20 +453,29 @@ switch ($_GET['ajax']) {
 		// Add URL to queue
 		require_once CLASS_DIR . 'download_queue.php';
 		$queue = new DownloadQueue();
-		
+
 		$url = isset($_POST['url']) ? trim($_POST['url']) : '';
-		$filename = isset($_POST['filename']) ? trim($_POST['filename']) : '';
+		$filename = basename(isset($_POST['filename']) ? trim($_POST['filename']) : '');
 		$opts = array(
 			'referer' => isset($_POST['referer']) ? $_POST['referer'] : '',
 			'cookie' => isset($_POST['cookie']) ? $_POST['cookie'] : ''
 		);
-		
+
 		if (empty($url)) {
 			header('Content-Type: application/json');
 			echo json_encode(array('success' => false, 'error' => 'URL is required'));
 			break;
 		}
-		
+		// Only allow http/https URLs to prevent SSRF via other schemes
+		$parsed_url = parse_url($url);
+		if (!$parsed_url || !in_array(strtolower($parsed_url['scheme'] ?? ''), array('http', 'https'), true)) {
+			header('Content-Type: application/json');
+			echo json_encode(array('success' => false, 'error' => 'Only http/https URLs are allowed'));
+			break;
+		}
+		// Sanitize filename and block dangerous extensions
+		$filename = fixfilename($filename);
+
 		$id = $queue->addToQueue($url, $filename, $opts);
 		
 		header('Content-Type: application/json');
@@ -547,8 +572,13 @@ switch ($_GET['ajax']) {
 			$started++;
 			
 			// Trigger background download (non-blocking)
-			$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-			$processUrl = $protocol . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/queue_worker.php?id=' . $next['id'];
+			// Use SERVER_NAME (controlled by web-server config) not HTTP_HOST (attacker-controlled)
+			$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+			$host = $_SERVER['SERVER_NAME'] ?? 'localhost';
+			$port = $_SERVER['SERVER_PORT'] ?? 80;
+			$defaultPort = ($protocol === 'https') ? 443 : 80;
+			$hostHeader = (intval($port) !== $defaultPort) ? $host . ':' . intval($port) : $host;
+			$processUrl = $protocol . '://' . $hostHeader . dirname($_SERVER['SCRIPT_NAME']) . '/queue_worker.php?id=' . urlencode($next['id']);
 			
 			// Use curl to trigger async
 			$ch = curl_init($processUrl);

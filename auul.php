@@ -31,12 +31,29 @@ include(TEMPLATE_DIR.'header.php');
 		$openwin = (int) $_POST['windows'];
 		if ($openwin <= 0) $openwin = 4;
 		$openwin--;
-		// Sort the upload hosts and files
+		// Build an ownership index from files.lst for quick lookup
+		$_auul_owned = array();
+		if (function_exists('_create_list')) {
+			// $list is populated by _create_list(); use it if already loaded
+		}
+		global $list;
+		if (!empty($list) && is_array($list)) {
+			foreach ($list as $entry) {
+				if (!isset($entry['owner']) || $entry['owner'] === USER_TOKEN) {
+					$_auul_owned[realpath($entry['name'])] = true;
+				}
+			}
+		}
+
+		// Sort the upload hosts and files — only allow files the current user owns
 		foreach ($_POST['files'] as $file) {
+			$filepath = realpath(DOWNLOAD_DIR . base64_decode($file));
+			// Reject if path escapes DOWNLOAD_DIR or doesn't belong to current user
+			if ($filepath === false || strncmp($filepath, realpath(DOWNLOAD_DIR), strlen(realpath(DOWNLOAD_DIR))) !== 0) continue;
+			if (!empty($_auul_owned) && !isset($_auul_owned[$filepath])) continue;
 			foreach ($_POST['hosts'] as $host) {
 				$hostss[] = $host;
-				$uploads[] = array('host' => $host,
-					'file' => DOWNLOAD_DIR.base64_decode($file));
+				$uploads[] = array('host' => $host, 'file' => $filepath);
 				$total++;
 			}
 		}
@@ -152,8 +169,6 @@ include(TEMPLATE_DIR.'header.php');
 	} else {
 ?>
 <?php 
-$options['show_all'] = true;
-$_COOKIE["showAll"] = 1;
 _create_list();
 require_once("classes/options.php");
 unset($Path);

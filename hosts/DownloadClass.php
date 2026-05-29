@@ -77,7 +77,7 @@ class DownloadClass {
 		$params['host'] = urlencode($url['host']);
 		if (!empty($url['port'])) $params['port'] = urlencode($url['port']);
 		$params['path'] = urlencode($url['path'] . (!empty($url['query']) ? '?' . $url['query'] : ''));
-		if (!empty($post)) $params['post'] = urlencode(encrypt(serialize($post)));
+		if (!empty($post)) $params['post'] = urlencode(encrypt(json_encode($post)));
 		if (!empty($auth)) $params['auth'] = ($auth == '1' ? '1' : urlencode(encrypt(base64_encode($auth))));
 		if (!empty($addon)) {
 			if (!is_array($addon)) html_error('Plugin problem! Please report, error: "The parameter passed must be an array"'); // Some problems with the plugin, quit it

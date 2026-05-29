@@ -26,6 +26,9 @@ if (!defined('RAPIDLEECH')) {
 
 class ytdlp_universal extends DownloadClass {
 
+	protected $_userCookieContent = '';
+	protected $_adminCookiesLoaded = false;
+
 	/**
 	 * Resolve the yt-dlp binary path from config or sensible defaults.
 	 */
@@ -145,10 +148,11 @@ class ytdlp_universal extends DownloadClass {
 				}
 			}
 		}
-		// Option C: Fall back to admin-configured cookies file
+		// Option C: Fall back to admin-configured cookies file (server-side only — never shown to users)
 		$adminCookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
 		if (empty($userCookieContent) && file_exists($adminCookieFile) && filesize($adminCookieFile) > 0) {
 			$userCookieContent = file_get_contents($adminCookieFile);
+			$this->_adminCookiesLoaded = true; // flag: must not be reflected to UI
 		}
 
 		// Write to a per-user temp file (deleted after download)
@@ -665,9 +669,13 @@ class ytdlp_universal extends DownloadClass {
 		echo '</form>';
 
 		// ── Cookie input for users (collapsible) ───────────────────────────
+		// Never expose admin-configured cookies to the user-facing UI.
 		$existingCookies = '';
-		$cookieFile = ROOT_DIR . PATH_SPLITTER . 'configs' . PATH_SPLITTER . 'ytdlp_cookies.txt';
-		if (file_exists($cookieFile)) $existingCookies = @file_get_contents($cookieFile) ?: '';
+		// Only pre-fill the textarea with cookies the current user submitted themselves
+		// (stored in session, not from the admin file).
+		if (!empty($_SESSION['ytdlp_user_cookies'])) {
+			$existingCookies = $_SESSION['ytdlp_user_cookies'];
+		}
 
 		echo '<details style="margin-top:24px;border:1px solid #333;border-radius:10px;overflow:hidden;">';
 		echo '<summary style="padding:14px 18px;cursor:pointer;font-weight:600;">🍪 Login Required? Paste Browser Cookies</summary>';

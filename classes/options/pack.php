@@ -46,7 +46,13 @@ function rl_pack() {
 function pack_go() {
 	global $list, $options;
 	$arc_name = basename($_POST["arc_name"].'.'.$_POST["arc_ext"]);	
-	$saveTo = ($options['download_dir_is_changeable'] ? stripslashes ( $_POST ["saveTo"] [$i] ) : realpath ( $options['download_dir'] )) . '/';
+	$safeBase = realpath($options['download_dir']);
+	if ($options['download_dir_is_changeable']) {
+		$candidate = realpath(stripslashes($_POST['saveTo'][$i] ?? ''));
+		$saveTo = ($candidate !== false && strncmp($candidate, $safeBase, strlen($safeBase)) === 0) ? $candidate . '/' : $safeBase . '/';
+	} else {
+		$saveTo = $safeBase . '/';
+	}
 	$v_list = array();
 	if (!$_POST["arc_name"] || !$_POST["arc_ext"]) {
 		echo lang(196)."<br /><br />";

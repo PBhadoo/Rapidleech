@@ -215,11 +215,11 @@ function resetProgress() {
 						$_GET['path'] = urlencode($purl['path'] . (!empty($purl['query']) ? '?' . $purl['query'] : ''));
 						$_GET['port'] = !empty($purl['port']) ? $purl['port'] : 80;
 						$_GET['cookie'] = !empty($_GET['cookie']) ? urlencode(encrypt($_GET['cookie'])) : '';
-						if (is_array($_GET['post'])) $_GET['post'] = urlencode(encrypt(serialize($_GET['post'])));
+						if (is_array($_GET['post'])) $_GET['post'] = urlencode(encrypt(json_encode($_GET['post'])));
 						$lastError = $_GET['auth'] = ''; // With $_GET['auth'] empty it will still using the $auth
 						unset($ref, $purl);
 					}
-					if ($lastError) echo "<script type='text/javascript'>updateStatus($i, '".addslashes($lastError)."');</script>$nn";
+					if ($lastError) echo "<script type='text/javascript'>updateStatus($i, ".json_encode($lastError).");</script>$nn";
 					elseif ($file['bytesReceived'] == $file['bytesTotal'] || $file['size'] == 'Unknown') {
 						echo "<script type='text/javascript'>updateStatus($i, '100%');</script>$nn";
 						write_file(CONFIG_DIR."files.lst", serialize(array('name' => $file['file'], 'size' => $file['size'], 'date' => time(), 'link' => $_GET['link'], 'comment' => (!empty($_GET['comment']) ? str_replace(array("\r", "\n"), array('\r', '\n'), $_GET['comment']) : ''))) . "\r\n", 0);

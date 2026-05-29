@@ -204,7 +204,7 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		$_GET['referer'] = !empty($_GET['referer']) ? urldecode(trim($_GET['referer'])) : 0;
 		$_GET['link'] = urldecode(trim($_GET['link']));
 
-		$_GET['post'] = !empty($_GET['post']) ? unserialize(decrypt(urldecode(trim($_GET['post'])))) : 0;
+		$_GET['post'] = !empty($_GET['post']) ? json_decode(decrypt(urldecode(trim($_GET['post']))), true) : 0;
 		$_GET['cookie'] = !empty($_GET['cookie']) ? decrypt(urldecode(trim($_GET['cookie']))) : '';
 		// $resume_from = $_GET["resume"] ? intval(urldecode(trim($_GET["resume"]))) : 0;
 		// if ($_GET["resume"]) {unset($_GET["resume"]);}

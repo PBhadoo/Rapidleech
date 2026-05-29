@@ -32,18 +32,24 @@ function delete_go() {
 	global $list, $PHP_SELF;
 	if (isset($_POST["yes"])) {
 		for($i = 0; $i < count ( $_POST ["files"] ); $i ++) {
-			$file = $list [$_POST ["files"] [$i]];
+			$idx = $_POST["files"][$i];
+			$file = $list[$idx];
+			// Enforce ownership: only allow deletion of own files
+			if (isset($file['owner']) && $file['owner'] !== USER_TOKEN) {
+				echo lang(154) . "<br />";
+				continue;
+			}
 			if (file_exists ( $file ["name"] )) {
 				if (@unlink ( $file ["name"] )) {
 					printf(lang(151),basename($file['name']));
 					echo "<br />";
-					unset ( $list [$_POST ["files"] [$i]] );
+					unset ( $list [$idx] );
 				} else {
 					printf(lang(152),basename($file['name']));
 					echo "<br />";
 				}
 			} else {
-				unset ( $list [$_POST ["files"] [$i]] );
+				unset ( $list [$idx] );
 				printf(lang(145),basename($file['name']));
 				echo "<br />";
 			}

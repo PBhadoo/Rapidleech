@@ -42,6 +42,10 @@ define('DOWNLOAD_DIR', (substr($options['download_dir'], 0, 6) == 'ftp://' ? '' 
 define('TEMPLATE_DIR', 'templates/' . $options['template_used'] . '/');
 define('IMAGE_DIR', TEMPLATE_DIR . 'images/');
 header('X-Frame-Options: SAMEORIGIN');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: same-origin');
+header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';");
 // Avoid Caching
 header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
 header('Last-Modified: ' . gmdate ("D, d M Y H:i:s") . 'GMT');
@@ -60,9 +64,15 @@ function get_user_token() {
     if (!empty($_COOKIE['rl_user_token']) && preg_match('/^[a-f0-9]{32}$/', $_COOKIE['rl_user_token'])) {
         return $_COOKIE['rl_user_token'];
     }
-    $token = md5(uniqid(mt_rand(), true) . ($_SERVER['REMOTE_ADDR'] ?? '') . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
-    // Set cookie for 1 year, httponly
-    @setcookie('rl_user_token', $token, time() + 365 * 86400, '/', '', false, true);
+    $token = bin2hex(random_bytes(16));
+    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    @setcookie('rl_user_token', $token, [
+        'expires'  => time() + 365 * 86400,
+        'path'     => '/',
+        'secure'   => $secure,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     $_COOKIE['rl_user_token'] = $token;
     return $token;
 }

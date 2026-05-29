@@ -64,7 +64,13 @@ function split_go() {
 		$split_ok = true;
 		$file = $list[$_POST['files'][$i]];
 		$partSize = round($_POST['partSize'][$i] * 1048576);
-		$saveTo = ($options['download_dir_is_changeable'] ? stripslashes($_POST['saveTo'][$i]) : realpath(DOWNLOAD_DIR) . '/');
+		$safeBase = realpath(DOWNLOAD_DIR);
+		if ($options['download_dir_is_changeable']) {
+			$candidate = realpath(stripslashes($_POST['saveTo'][$i]));
+			$saveTo = ($candidate !== false && strncmp($candidate, $safeBase, strlen($safeBase)) === 0) ? $candidate . '/' : $safeBase . '/';
+		} else {
+			$saveTo = $safeBase . '/';
+		}
 		if (substr($saveTo, -1) != '/') $saveTo .= '/';
 		$dest_name = basename($file['name']);
 		$fileSize = filesize($file['name']);

@@ -5,6 +5,10 @@ if (! defined ( 'RAPIDLEECH' )) {
 }
 
 function xmail($from, $to, $subj, $text, $filename, $partSize = FALSE, $method = FALSE) {
+	// Strip CR/LF to prevent mail header injection
+	$from = str_replace(array("\r", "\n"), '', $from);
+	$to   = str_replace(array("\r", "\n"), '', $to);
+	$subj = str_replace(array("\r", "\n"), '', $subj);
 	global $un;
 	$fileContents = read_file ( $filename );
 	$fileSize = strlen ( $fileContents );

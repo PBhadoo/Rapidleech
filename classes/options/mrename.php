@@ -35,8 +35,17 @@ function mrename_go() {
 			for($i = 0; $i < count ( $_POST ["files"] ); $i ++) {
 				$file = $list [$_POST ["files"] [$i]];
 				if (file_exists ( $file ["name"] )) {
-					$filetype = '.' . strtolower ( $_POST ['extension'] );
-					if (is_array ( $options['forbidden_filetypes'] ) && in_array ( '.' . strtolower ( $_POST ['extension'] ), $options['forbidden_filetypes'] )) {
+					// Strip leading dots; reject if extension itself contains a dot (double-ext bypass)
+					$ext = strtolower ( $_POST ['extension'] );
+					if (strpos($ext, '.') !== false) {
+						echo lang(82) . '<br /><br />';
+						continue;
+					}
+					$filetype = '.' . $ext;
+					if (is_array ( $options['forbidden_filetypes'] ) && in_array ( $filetype, $options['forbidden_filetypes'] )) {
+						printf(lang(82),$filetype);
+						echo('<br /><br />');
+					} elseif (preg_match('@\.(php\d*|phtml|pht|phar|phps|sph|hta|htaccess|pl|py|cgi|shtml|module|inc|sh|bash|exe|bat|cmd|com|msi|vbs|vbe|js|jse|wsf|wsh|ps1|psm1|psd1)$@i', $filetype)) {
 						printf(lang(82),$filetype);
 						echo('<br /><br />');
 					} else {

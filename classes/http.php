@@ -64,8 +64,10 @@ function readCustomHeaders(&$referer) {
 				$tmp = array_map('trim', explode(':', $tmp, 2));
 				// Avoid set an empty method header (key: '')
 				if ($tmp[0] !== '' || $tmp[1] !== '') {
-					// Key must be lowercase (for override default header)
-					$headers[strtolower($tmp[0])] = $tmp[1];
+					// Strip CR/LF from header name and value to prevent injection
+					$name = str_replace(array("\r", "\n"), '', strtolower($tmp[0]));
+					$value = str_replace(array("\r", "\n"), '', $tmp[1] ?? '');
+					$headers[$name] = $value;
 				}
 			}
 		}
@@ -537,8 +539,8 @@ function cURL($link, $cookie = 0, $post = 0, $referer = 0, $auth = 0, $opts = 0)
 		$header = array_filter($arr);
 	} else $header = array();
 	$link = str_replace(array(' ', "\r", "\n"), array('%20'), $link);
-	$opt = array(CURLOPT_HEADER => 1, CURLOPT_SSL_VERIFYPEER => 0,
-		CURLOPT_SSL_VERIFYHOST => 0, CURLOPT_RETURNTRANSFER => 1,
+	$opt = array(CURLOPT_HEADER => 1, CURLOPT_SSL_VERIFYPEER => 1,
+		CURLOPT_SSL_VERIFYHOST => 2, CURLOPT_RETURNTRANSFER => 1,
 		CURLOPT_FOLLOWLOCATION => 0, CURLOPT_FAILONERROR => 0,
 		CURLOPT_FORBID_REUSE => 0, CURLOPT_FRESH_CONNECT => 0,
 		CURLINFO_HEADER_OUT => 1, CURLOPT_URL => $link,

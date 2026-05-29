@@ -16,7 +16,7 @@ $ADMIN_USER = isset($options['admin_user']) ? $options['admin_user'] : 'admin';
 $ADMIN_PASS = isset($options['admin_pass']) ? $options['admin_pass'] : 'admin';
 
 // Basic auth
-if (empty($_SERVER['PHP_AUTH_USER']) || $_SERVER['PHP_AUTH_USER'] !== $ADMIN_USER || $_SERVER['PHP_AUTH_PW'] !== $ADMIN_PASS) {
+if (empty($_SERVER['PHP_AUTH_USER']) || !hash_equals($ADMIN_USER, $_SERVER['PHP_AUTH_USER']) || !hash_equals($ADMIN_PASS, $_SERVER['PHP_AUTH_PW'])) {
     header('WWW-Authenticate: Basic realm="RapidLeech Admin"');
     header('HTTP/1.0 401 Unauthorized');
     die('Access Denied');
@@ -191,6 +191,25 @@ if (isset($_GET['kill_pid'])) {
     header('Content-Type: application/json');
     $pid = intval($_GET['kill_pid']);
     if ($pid > 1) {
+        // Verify PID belongs to a tracked download before killing
+        $dlsFile = $configDir . '/downloads.lst';
+        $dlContent = @file_get_contents($dlsFile);
+        $trackedPid = false;
+        if ($dlContent) {
+            $dls = @unserialize($dlContent);
+            if (is_array($dls)) {
+                foreach ($dls as $dl) {
+                    if (isset($dl['pid']) && intval($dl['pid']) === $pid) {
+                        $trackedPid = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!$trackedPid) {
+            echo json_encode(array('success' => false, 'error' => 'PID not found in active downloads'));
+            exit;
+        }
         $isWin = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
         if ($isWin) {
             $out = @shell_exec('taskkill /PID ' . $pid . ' /F 2>&1');
@@ -254,6 +273,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
         case 'save_accounts':
             $content = $_POST['accounts_content'] ?? '';
+            // Guard: block content that injects PHP execution tags
+            if (preg_match('/<\?(?!xml\s)/i', $content) || stripos($content, '<%') !== false) {
+                $message = 'Rejected: content contains PHP/script tags.';
+                $messageType = 'error';
+                break;
+            }
             if (@file_put_contents($accountsFile, $content)) {
                 rl_log_admin('Save accounts', 'Premium accounts updated');
                 $message = 'Premium accounts saved successfully.';
@@ -266,6 +291,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         case 'save_config':
             $content = $_POST['config_content'] ?? '';
+            // Guard: block content that injects PHP execution tags
+            if (preg_match('/<\?(?!xml\s)/i', $content) || stripos($content, '<%') !== false) {
+                $message = 'Rejected: content contains PHP/script tags.';
+                $messageType = 'error';
+                break;
+            }
             if (@file_put_contents($configFile, $content)) {
                 rl_log_admin('Save config', 'Configuration updated');
                 $message = 'Configuration saved successfully. Reload the page to apply changes.';
@@ -275,16 +306,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             }
             break;
-            
+
         case 'run_command':
-            $cmd = $_POST['command'] ?? '';
-            if (!empty($cmd)) {
-                rl_log_admin('Shell command', $cmd);
-                $cmd = "cd $rootDir && " . $cmd . " 2>&1";
-                $output = shell_exec($cmd);
-                $message = "Command executed.";
-                $messageType = 'success';
-            }
+            // Removed: arbitrary shell execution via web UI is an RCE vector.
+            $message = 'Shell command execution is disabled for security.';
+            $messageType = 'error';
             break;
 
         case 'clear_logs':
