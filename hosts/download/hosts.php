@@ -2,7 +2,7 @@
 $host = array();
 $d = dir(HOST_DIR . 'download/');
 $HostnamesToFix = array('ex.load.com' => 'ex-load.com', 'samsung.firmware.org' => 'samsung-firmware.org');
-$HostnamesToIgnore = array('hosts', 'genericxfs.dl');
+$HostnamesToIgnore = array('hosts', 'genericxfs.dl', 'youtube.com');
 while (false !== ($entry = $d->read())) {
 	if (strtolower(strrchr($entry, '.')) == '.php' && stripos($entry, '.JD') === false) {
 		$hostname = strtolower(substr($entry, 0, -4));
