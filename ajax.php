@@ -612,15 +612,24 @@ switch ($_GET['ajax']) {
 	case 'mega_queue_check':
 		if (!defined('DOWNLOAD_DIR')) define('DOWNLOAD_DIR', $options['download_dir']);
 		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		header('Content-Type: application/json');
 		if (!file_exists($lockFile)) {
-			echo 'free';
+			echo json_encode(array('status' => 'free'));
 		} else {
 			$lockData = @json_decode(@file_get_contents($lockFile), true);
 			$lockAge = time() - (!empty($lockData['start_time']) ? $lockData['start_time'] : (!empty($lockData['time']) ? $lockData['time'] : 0));
 			if (!$lockData || $lockAge > 1800) {
-				echo 'free';
+				echo json_encode(array('status' => 'free'));
 			} else {
-				echo 'busy';
+				$elapsed = $lockAge;
+				$resp = array(
+					'status'   => 'busy',
+					'elapsed'  => $elapsed,
+					'filename' => !empty($lockData['filename']) ? $lockData['filename'] : '',
+					'size'     => !empty($lockData['size']) ? $lockData['size'] : '',
+					'link_preview' => !empty($lockData['link']) ? substr($lockData['link'], 0, 40) . '…' : '',
+				);
+				echo json_encode($resp);
 			}
 		}
 		break;

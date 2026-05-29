@@ -73,6 +73,8 @@ class mega_co_nz extends DownloadClass {
 		$attr = $this->dec_attr($this->base64url_decode($reply[0]['at']), $key);
 		if (empty($attr)) html_error((!empty($fid[1]) ? 'Folder Error: ' : '').'File\'s key isn\'t correct.');
 
+		$this->updateMegaLock($attr['n'], !empty($reply[0]['s']) ? (int)$reply[0]['s'] : 0);
+
 		$this->RedirectDownload($reply[0]['g'], $attr['n'], 0, 0, $link, 0, 0, array('T8[fkey]' => $fid[3]));
 	}
 
@@ -125,17 +127,33 @@ class mega_co_nz extends DownloadClass {
 		}
 
 		// Another download is active - show queue page with auto-retry
-		$waited = 0;
-		$retryInterval = 5; // Check every 5 seconds
+		$retryInterval = 5;
 		$form = $this->DefaultParamArr($link);
 
-		echo '<div style="text-align:center; padding:20px;">';
-		echo '<h3 style="color:var(--fl-accent,#6366f1);">⏳ Mega Download Queue</h3>';
-		echo '<p>Another Mega download is currently in progress.</p>';
-		echo '<p>Your download will start automatically when the current one finishes.</p>';
-		echo '<p style="font-size:13px; color:var(--fl-text-3,#888);">Currently downloading: <b>' . htmlspecialchars($lockData['link'] ?? 'unknown') . '...</b></p>';
-		echo '<div id="mega_queue_status" style="margin:20px 0; padding:15px; background:var(--fl-surface-alt,#1e2231); border-radius:12px;">';
-		echo '<span id="mega_queue_msg">Waiting in queue... Checking every ' . $retryInterval . ' seconds.</span>';
+		$initialFilename = !empty($lockData['filename']) ? $lockData['filename'] : '';
+		$initialSize     = !empty($lockData['size']) ? $lockData['size'] : 0;
+		$initialElapsed  = time() - (!empty($lockData['start_time']) ? $lockData['start_time'] : time());
+		$linkPreview     = !empty($lockData['link']) ? htmlspecialchars(substr($lockData['link'], 0, 40)) . '…' : 'mega.nz/…';
+
+		echo '<div style="max-width:600px;margin:30px auto;padding:0 16px;">';
+		echo '<h3 style="text-align:center;color:var(--fl-accent,#6366f1);">⏳ Mega Download Queue</h3>';
+		echo '<p style="text-align:center;opacity:.7;">Your download will start automatically when the slot is free.</p>';
+
+		// Active download card
+		echo '<div style="margin:20px 0;padding:18px;background:var(--fl-surface-alt,#1e2231);border-radius:12px;border:1px solid var(--fl-border,#2d3148);">';
+		echo '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.5;margin-bottom:10px;">Currently Downloading</div>';
+		echo '<div id="mq_filename" style="font-weight:600;font-size:15px;margin-bottom:6px;word-break:break-all;">'
+			. ($initialFilename ? htmlspecialchars($initialFilename) : '<span style="opacity:.5;">' . $linkPreview . '</span>') . '</div>';
+		echo '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;opacity:.7;">';
+		echo '<span>🕒 Running: <b id="mq_elapsed">' . gmdate('H:i:s', $initialElapsed) . '</b></span>';
+		if ($initialSize) echo '<span>📦 Size: <b>' . htmlspecialchars(bytesToKbOrMbOrGb($initialSize)) . '</b></span>';
+		else echo '<span>📦 Size: <b id="mq_size">—</b></span>';
+		echo '</div>';
+		echo '</div>';
+
+		// Queue status
+		echo '<div id="mq_status" style="text-align:center;padding:12px;background:var(--fl-surface-alt,#1e2231);border-radius:10px;font-size:13px;opacity:.8;">';
+		echo 'Checking every ' . $retryInterval . 's…';
 		echo '</div>';
 		echo '</div>';
 
@@ -143,38 +161,46 @@ class mega_co_nz extends DownloadClass {
 		foreach ($form as $name => $input) echo "<input type='hidden' name='$name' value='" . htmlspecialchars($input, ENT_QUOTES) . "' />\n";
 		echo "</form>\n";
 
-		echo "<script type='text/javascript'>
-		var mqRetries = 0;
-		var mqMax = " . intval($maxWait / $retryInterval) . ";
-		function mqCheck() {
+		echo "<script>
+		var mqRetries=0, mqMax=" . intval($maxWait / $retryInterval) . ", mqStart=" . ($initialElapsed ?: 0) . ";
+		var mqElapsedSec=mqStart;
+		setInterval(function(){ mqElapsedSec++; var h=Math.floor(mqElapsedSec/3600),m=Math.floor((mqElapsedSec%3600)/60),s=mqElapsedSec%60; document.getElementById('mq_elapsed').textContent=(h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }, 1000);
+		function mqCheck(){
 			mqRetries++;
-			document.getElementById('mega_queue_msg').innerHTML = 'Waiting in queue... Attempt ' + mqRetries + '/' + mqMax + ' (auto-retry in {$retryInterval}s)';
-			if (mqRetries >= mqMax) {
-				document.getElementById('mega_queue_msg').innerHTML = 'Queue timeout. <a href=\"javascript:document.mega_queue_form.submit();\">Click to retry</a>';
-				return;
-			}
-			// Use AJAX to check if lock is released
-			var xhr = new XMLHttpRequest();
-			xhr.open('GET', 'ajax.php?ajax=mega_queue_check&t=' + Date.now(), true);
-			xhr.onreadystatechange = function() {
-				if (xhr.readyState == 4 && xhr.status == 200) {
-					if (xhr.responseText.indexOf('free') !== -1) {
-						document.getElementById('mega_queue_msg').innerHTML = '<b>Queue is free! Starting download...</b>';
-						document.mega_queue_form.submit();
-					} else {
-						setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
-					}
-				} else if (xhr.readyState == 4) {
-					setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
+			if(mqRetries>=mqMax){ document.getElementById('mq_status').innerHTML='<b>Timeout.</b> <a href=\"#\" onclick=\"document.mega_queue_form.submit();return false;\">Click to retry</a>'; return; }
+			var xhr=new XMLHttpRequest();
+			xhr.open('GET','ajax.php?ajax=mega_queue_check&t='+Date.now(),true);
+			xhr.onreadystatechange=function(){
+				if(xhr.readyState!=4) return;
+				if(xhr.status==200){
+					try{ var d=JSON.parse(xhr.responseText); } catch(e){ setTimeout(mqCheck," . ($retryInterval * 1000) . "); return; }
+					if(d.status==='free'){ document.getElementById('mq_status').innerHTML='<b style=\"color:#22c55e;\">✅ Slot is free! Starting your download…</b>'; document.mega_queue_form.submit(); return; }
+					if(d.filename){ document.getElementById('mq_filename').textContent=d.filename; }
+					if(d.size){ document.getElementById('mq_size').textContent=formatBytes(d.size); }
+					document.getElementById('mq_status').textContent='Waiting… attempt '+mqRetries+'/'+mqMax+' — next check in {$retryInterval}s';
 				}
+				setTimeout(mqCheck," . ($retryInterval * 1000) . ");
 			};
 			xhr.send();
 		}
-		setTimeout(mqCheck, " . ($retryInterval * 1000) . ");
+		function formatBytes(b){ if(!b||b<=0) return '—'; var u=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(1024)); return (b/Math.pow(1024,i)).toFixed(1)+' '+u[i]; }
+		setTimeout(mqCheck," . ($retryInterval * 1000) . ");
 		</script>";
 
 		include(TEMPLATE_DIR.'footer.php');
 		exit();
+	}
+
+	public function updateMegaLock($filename, $size = 0) {
+		$lockFile = DOWNLOAD_DIR . '.mega_lock';
+		if (!file_exists($lockFile)) return;
+		$lockData = @json_decode(@file_get_contents($lockFile), true);
+		if ($lockData && $lockData['pid'] == getmypid()) {
+			$lockData['filename'] = basename($filename);
+			$lockData['size'] = $size;
+			$lockData['time'] = time();
+			@file_put_contents($lockFile, json_encode($lockData), LOCK_EX);
+		}
 	}
 
 	public function releaseMegaLock() {
