@@ -208,6 +208,22 @@ class ytdlp_universal extends DownloadClass {
 			$confLines .= '--cookies "' . $userCookieFile . '"' . "\n";
 		}
 
+		// Extra user-supplied yt-dlp arguments (sanitized)
+		if (!empty($_POST['ytdlp_extra_args'])) {
+			$blocked = array('--exec', '--exec-before-download', '--cookies', '--cookies-from-browser',
+				'--config-location', '--ignore-config', '-o', '--output', '--print',
+				'--no-playlist', '--newline', '--no-part', '--no-mtime', '--merge-output-format',
+				'--cache-dir', '--restrict-filenames', '--no-overwrites');
+			foreach (preg_split('/\s+/', trim($_POST['ytdlp_extra_args'])) as $arg) {
+				if ($arg === '') continue;
+				// Allow only --flag or --flag=safevalue or -x style; block dangerous flags
+				if (!preg_match('/^--?[a-zA-Z][a-zA-Z0-9-]*(=[^\s\'";&|`$<>]*)?$/', $arg)) continue;
+				$flagName = explode('=', $arg, 2)[0];
+				if (in_array(strtolower($flagName), $blocked)) continue;
+				$confLines .= $arg . "\n";
+			}
+		}
+
 		file_put_contents($tmpConf, $confLines);
 
 		$cmd  = $safeBin;
@@ -586,6 +602,8 @@ class ytdlp_universal extends DownloadClass {
 		if ($duration) echo '<p style="margin:4px 0;opacity:0.7;">Duration: ' . htmlspecialchars($duration) . '</p>';
 		echo '</div></div>';
 
+		$existingExtraArgs = !empty($_POST['ytdlp_extra_args']) ? trim($_POST['ytdlp_extra_args']) : '';
+
 		echo '<form method="POST" action="' . htmlspecialchars($_SERVER['SCRIPT_NAME']) . '" id="ytdlpForm">';
 		$params = $this->DefaultParamArr($link);
 		foreach ($params as $k => $v) echo '<input type="hidden" name="' . htmlspecialchars($k) . '" value="' . htmlspecialchars($v) . '" />';
@@ -665,6 +683,16 @@ class ytdlp_universal extends DownloadClass {
 			}
 			echo '</div></details>';
 		}
+
+		// ── Extra yt-dlp arguments (visible input) ────────────────────────
+		echo '<details style="margin-top:16px;border:1px solid #333;border-radius:10px;overflow:hidden;"' . ($existingExtraArgs ? ' open' : '') . '>';
+		echo '<summary style="padding:14px 18px;cursor:pointer;font-weight:600;">⚙️ Extra yt-dlp Arguments</summary>';
+		echo '<div style="padding:18px;">';
+		echo '<p style="opacity:0.6;font-size:13px;margin-bottom:10px;">Space-separated flags (e.g. <code>--write-subs --embed-subs --sub-lang en</code>). Flags that conflict with internal settings are ignored.</p>';
+		echo '<input type="text" name="ytdlp_extra_args" value="' . htmlspecialchars($existingExtraArgs) . '" '
+			. 'style="width:100%;padding:10px;border-radius:8px;border:1px solid #444;background:rgba(0,0,0,.3);color:inherit;font:13px/1.5 monospace;box-sizing:border-box;" '
+			. 'placeholder="--write-subs --embed-subs --sub-lang en" />';
+		echo '</div></details>';
 
 		echo '</form>';
 
