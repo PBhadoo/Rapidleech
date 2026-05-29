@@ -1,10 +1,10 @@
 var idleTime = 0;
 $(document).ready(function(){
-  var idleInterval = setInterval("idleTime++;", 1000);
+  var idleInterval = setInterval(function(){ idleTime++; }, 1000);
   $(this).mousemove(function(e){
     var tmp = idleTime;
     idleTime = 0;
-    if (tmp >= 120) { stats_timer = setTimeout("refreshStats()",1000); }
+    if (tmp >= 120) { stats_timer = setTimeout(refreshStats, 1000); }
   });
 });
 
@@ -29,7 +29,7 @@ function refreshStats() {
 			if (stats_timed < 60) { stats_timed = stats_timed + 10; }
 			if (idleTime < 120) {
 				clearTimeout(stats_timer);
-				stats_timer = setTimeout("refreshStats()",stats_timed * 1000);
+				stats_timer = setTimeout(refreshStats, stats_timed * 1000);
 			}
 		}
 	});
