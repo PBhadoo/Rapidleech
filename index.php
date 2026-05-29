@@ -267,6 +267,13 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		// Register download for tracking
 		$GLOBALS['current_download_id'] = generate_download_id();
 		register_download($GLOBALS['current_download_id'], $_GET['link'], basename($_GET['filename']), 0);
+		// Safety net: clean up tracker if html_error()/exit() fires mid-stream
+		register_shutdown_function(function() {
+			if (!empty($GLOBALS['current_download_id'])) {
+				complete_download($GLOBALS['current_download_id']);
+				$GLOBALS['current_download_id'] = '';
+			}
+		});
 		
 		// Log download start
 		if (function_exists('rl_log_download_start')) {
@@ -285,6 +292,7 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 		// Mark download as complete
 		if (!empty($GLOBALS['current_download_id'])) {
 			complete_download($GLOBALS['current_download_id']);
+			$GLOBALS['current_download_id'] = '';
 		}
 
 		if ($options['redir'] && $lastError && strpos($lastError, substr(lang(95), 0, strpos(lang(95), '%1$s'))) !== false) {
