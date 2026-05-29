@@ -24,9 +24,9 @@ class mega_co_nz extends DownloadClass {
 			flush();
 			$this->megaDebugInit = true;
 		}
-		$jsMsg = addslashes($safe);
+		$jsMsg = json_encode($safe, JSON_UNESCAPED_SLASHES);
 		echo "<script>!function(){var p=document.getElementById('mega-log');if(!p)return;"
-			. "p.innerHTML+='<span style=\"color:#8b949e\">[{$ts}]</span> <span style=\"color:{$color};font-weight:600\">[{$level}]</span> {$jsMsg}\\n';"
+			. "p.innerHTML+='<span style=\"color:#8b949e\">[{$ts}]</span> <span style=\"color:{$color};font-weight:600\">[{$level}]</span> '+{$jsMsg}+'\\n';"
 			. "p.scrollTop=p.scrollHeight;}();</script>\n";
 		flush();
 		if (function_exists('rl_log')) rl_log($level === 'OK' ? 'INFO' : $level, '[Mega] ' . $msg);
@@ -351,26 +351,37 @@ class mega_co_nz extends DownloadClass {
 	private function doApiReq($atrr, $node='') {
 		if (!function_exists('json_encode')) html_error('Error: Please enable JSON in php.');
 		$page = $this->GetPage('https://g.api.mega.co.nz/cs?id=' . ($this->seqno++) . (!empty($node) ? "&n=$node" : '') . (!empty($this->cookie['sid']) ? "&sid={$this->cookie['sid']}" : ''), 0, json_encode((!empty($atrr[0]) && is_array($atrr[0])) ? $atrr : array($atrr)), "https://mega.nz/\r\nContent-Type: application/json");
-		if (in_array(intval(substr($page, 9, 3)), array(500, 503))) return array(-3); //  500 Server Too Busy
-		// Split headers from body; fall back gracefully if separator is absent
-		$parts = explode("\r\n\r\n", $page, 2);
-		$body  = isset($parts[1]) ? trim($parts[1]) : '';
+		$httpStatus = intval(substr($page, 9, 3));
+		if (in_array($httpStatus, array(500, 503))) return array(-3);
+		// 402: Mega hashcash challenge — clear cached session so next attempt forces fresh login
+		if ($httpStatus === 402) {
+			$sessionFile = DOWNLOAD_DIR . 'mega_dl.php';
+			if (file_exists($sessionFile)) {
+				@unlink($sessionFile);
+				$this->megaLog('HTTP 402 from Mega API — cached session deleted. Retry to attempt fresh login.', 'WARN');
+			} else {
+				$this->megaLog('HTTP 402 from Mega API (hashcash challenge). Mega may be rate-limiting this IP.', 'ERROR');
+			}
+			html_error('[Mega API]: HTTP 402 — Mega requires proof-of-work (hashcash). Your cached login session has been cleared. Please try again to re-authenticate. If the error persists, Mega may be temporarily rate-limiting this server.');
+		}
+		// Split headers from body; only use content after last \r\n\r\n (handles redirect chains)
+		$sep = strrpos($page, "\r\n\r\n");
+		$body = ($sep !== false) ? trim(substr($page, $sep + 4)) : '';
 		if ($body === '') {
-			// Try \n\n separator (HTTP/2 or unusual servers)
-			$parts2 = explode("\n\n", $page, 2);
-			$body = isset($parts2[1]) ? trim($parts2[1]) : trim($page);
+			$sep2 = strrpos($page, "\n\n");
+			$body = ($sep2 !== false) ? trim(substr($page, $sep2 + 2)) : '';
 		}
 		if (is_numeric($body)) return array(intval($body));
 		// Parse JSON inline — avoids json2array()'s own \r\n\r\n stripping which can destroy already-extracted body
 		if ($body === '') {
-			$this->megaLog('API empty body. Raw response: ' . htmlspecialchars(substr($page, 0, 400), ENT_QUOTES), 'ERROR');
-			html_error('[Mega API]: Empty response from server. Check your network/proxy and try again.');
+			$this->megaLog('API empty body (HTTP ' . $httpStatus . '). Headers: ' . htmlspecialchars(preg_replace('/\s+/', ' ', substr($page, 0, 300)), ENT_QUOTES), 'ERROR');
+			html_error('[Mega API]: Empty response from server (HTTP ' . $httpStatus . '). Check your network/proxy and try again.');
 		}
 		$cb = strpos($body, '{');
 		$sb = strpos($body, '[');
 		if ($cb === false && $sb === false) {
-			$this->megaLog('API non-JSON response: ' . htmlspecialchars(substr($body, 0, 400), ENT_QUOTES), 'ERROR');
-			html_error('[Mega API]: Server returned a non-JSON response (rate-limit or error page). See debug log above.');
+			$this->megaLog('API non-JSON (HTTP ' . $httpStatus . '): ' . htmlspecialchars(preg_replace('/\s+/', ' ', substr($body, 0, 400)), ENT_QUOTES), 'ERROR');
+			html_error('[Mega API]: Server returned a non-JSON response (HTTP ' . $httpStatus . '). See debug log above.');
 		}
 		$useBracket = ($cb === false || ($sb !== false && $sb < $cb));
 		$json_str   = substr($body, $useBracket ? $sb : $cb);
