@@ -361,13 +361,30 @@ class mega_co_nz extends DownloadClass {
 			$body = isset($parts2[1]) ? trim($parts2[1]) : trim($page);
 		}
 		if (is_numeric($body)) return array(intval($body));
-		// Detect non-JSON response before json2array() throws "No content" / "JSON start braces not found"
+		// Parse JSON inline — avoids json2array()'s own \r\n\r\n stripping which can destroy already-extracted body
 		if ($body === '') {
-			$this->megaLog('API returned empty body — possible network/proxy issue. Raw: ' . htmlspecialchars(substr($page, 0, 300), ENT_QUOTES), 'ERROR');
-		} elseif ($body[0] !== '[' && $body[0] !== '{') {
-			$this->megaLog('API returned non-JSON body — possible rate-limit or server error. Preview: ' . htmlspecialchars(substr($body, 0, 300), ENT_QUOTES), 'ERROR');
+			$this->megaLog('API empty body. Raw response: ' . htmlspecialchars(substr($page, 0, 400), ENT_QUOTES), 'ERROR');
+			html_error('[Mega API]: Empty response from server. Check your network/proxy and try again.');
 		}
-		return $this->json2array($body);
+		$cb = strpos($body, '{');
+		$sb = strpos($body, '[');
+		if ($cb === false && $sb === false) {
+			$this->megaLog('API non-JSON response: ' . htmlspecialchars(substr($body, 0, 400), ENT_QUOTES), 'ERROR');
+			html_error('[Mega API]: Server returned a non-JSON response (rate-limit or error page). See debug log above.');
+		}
+		$useBracket = ($cb === false || ($sb !== false && $sb < $cb));
+		$json_str   = substr($body, $useBracket ? $sb : $cb);
+		$json_str   = substr($json_str, 0, strrpos($json_str, $useBracket ? ']' : '}') + 1);
+		if (empty($json_str)) {
+			$this->megaLog('JSON extraction failed. Body: ' . htmlspecialchars(substr($body, 0, 400), ENT_QUOTES), 'ERROR');
+			html_error('[Mega API]: Could not extract JSON from response.');
+		}
+		$result = json_decode($json_str, true);
+		if ($result === null) {
+			$this->megaLog('JSON decode error. Snippet: ' . htmlspecialchars(substr($json_str, 0, 400), ENT_QUOTES), 'ERROR');
+			html_error('[Mega API]: JSON response could not be decoded.');
+		}
+		return $result;
 	}
 
 	private function str_to_a32($b) {
