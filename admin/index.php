@@ -128,13 +128,18 @@ if (isset($_GET['get_pending'])) {
             $now = time();
             foreach ($dls as $id => $dl) {
                 if (($now - $dl['last_update']) > 120) continue;
+                $elapsed = $now - $dl['start_time'];
+                $speed = ($elapsed > 0 && $dl['received_bytes'] > 0) ? round($dl['received_bytes'] / $elapsed / 1024) : 0;
                 $result['downloads'][] = array(
                     'id' => $id,
                     'filename' => $dl['filename'],
                     'pid' => $dl['pid'],
                     'percent' => $dl['percent'],
                     'status' => $dl['status'],
-                    'elapsed' => $now - $dl['start_time'],
+                    'elapsed' => $elapsed,
+                    'received_bytes' => $dl['received_bytes'] ?? 0,
+                    'total_bytes' => $dl['total_bytes'] ?? 0,
+                    'speed_kb' => $speed,
                 );
             }
         }
@@ -885,8 +890,15 @@ function loadPending(){
                 rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e2231;flex-wrap:wrap">';
                 rows+='<div style="flex:1;min-width:200px">';
                 rows+='<div style="font-weight:500;color:#e8ecf4">'+escHtml(dl.filename||'Unknown')+'</div>';
-                rows+='<div style="font-size:12px;color:#606880;margin-top:2px">PID: '+dl.pid+' &nbsp;·&nbsp; Elapsed: '+fmtSeconds(dl.elapsed)+' &nbsp;·&nbsp; Status: '+escHtml(dl.status)+'</div>';
-                if(dl.percent>0){rows+='<div style="height:4px;background:#282d3e;border-radius:2px;margin-top:6px"><div style="height:100%;width:'+dl.percent+'%;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:2px"></div></div>';}
+                var dlMeta='PID: '+dl.pid+' &nbsp;·&nbsp; Elapsed: '+fmtSeconds(dl.elapsed);
+                if(dl.percent>0) dlMeta+=' &nbsp;·&nbsp; <b style="color:#a5b4fc">'+dl.percent+'%</b>';
+                if(dl.speed_kb>0) dlMeta+=' &nbsp;·&nbsp; '+fmtKBs(dl.speed_kb);
+                if(dl.percent>0 && dl.speed_kb>0 && dl.total_bytes>dl.received_bytes){
+                    var eta=Math.round((dl.total_bytes-dl.received_bytes)/1024/dl.speed_kb);
+                    if(eta>0) dlMeta+=' &nbsp;·&nbsp; ETA '+fmtSeconds(eta);
+                }
+                rows+='<div style="font-size:12px;color:#606880;margin-top:2px">'+dlMeta+'</div>';
+                if(dl.percent>0){rows+='<div style="height:4px;background:#282d3e;border-radius:2px;margin-top:6px"><div style="height:100%;width:'+Math.min(dl.percent,100)+'%;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:2px;transition:width .5s"></div></div>';}
                 rows+='</div>';
                 rows+='<button onclick="killPid('+dl.pid+')" class="btn btn-danger" style="padding:5px 12px;font-size:12px">✕ Cancel</button>';
                 rows+='</div>';
@@ -937,6 +949,7 @@ function clearMegaLock(){
 }
 
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtKBs(kb){if(kb>=1024)return (kb/1024).toFixed(1)+' MB/s';return kb+' KB/s';}
 
 // Load immediately and refresh every 5 seconds
 loadPending();

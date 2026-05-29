@@ -264,9 +264,10 @@ if (empty($_GET['filename']) || empty($_GET['host']) || empty($_GET['path'])) {
 
 		$url = parse_url($_GET['link']);
 		if (empty($url['port'])) $url['port'] = $_GET['port'];
-		// Register download for tracking
+		// Register download for tracking (use known file size from plugin if provided)
 		$GLOBALS['current_download_id'] = generate_download_id();
-		register_download($GLOBALS['current_download_id'], $_GET['link'], basename($_GET['filename']), 0);
+		$_knownSize = (!empty($_GET['T8']['fileSize']) && is_numeric($_GET['T8']['fileSize'])) ? (int)$_GET['T8']['fileSize'] : 0;
+		register_download($GLOBALS['current_download_id'], $_GET['link'], basename($_GET['filename']), $_knownSize);
 		// Safety net: clean up tracker + Mega slot if html_error()/exit() fires mid-stream
 		register_shutdown_function(function() {
 			if (!empty($GLOBALS['current_download_id'])) {

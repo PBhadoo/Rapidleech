@@ -123,13 +123,14 @@ class mega_co_nz extends DownloadClass {
 		$this->updateMegaLock($attr['n'], $fileSize);
 
 		$this->megaLog('Starting download stream…');
-		// Hand the slot to the second request so it stays alive during the actual download.
+		// Hand the slot and known file size to the second request.
 		// Clear $this->mySlotFile so the shutdown function skips cleanup on this happy-path exit.
 		$slotBase = !empty($this->mySlotFile) ? basename($this->mySlotFile) : '';
 		$this->mySlotFile = '';
 		$this->RedirectDownload($reply[0]['g'], $attr['n'], 0, 0, $link, 0, 0, array(
 			'T8[fkey]'     => $fid[3],
 			'T8[megaSlot]' => $slotBase,
+			'T8[fileSize]' => $fileSize,
 		));
 	}
 
