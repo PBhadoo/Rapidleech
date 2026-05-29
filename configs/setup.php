@@ -30,7 +30,7 @@ header('Last-Modified: ' . gmdate ("D, d M Y H:i:s") . 'GMT');
 header('Cache-Control: max-age=0, no-store, no-cache, must-revalidate, proxy-revalidate, post-check=0, pre-check=0');
 header('Pragma: no-cache');
 
-define('TEMPLATE_DIR', 'templates/plugmod/');
+define('TEMPLATE_DIR', 'templates/flavor/');
 //$options['default_language'] = "en";
 require_once('classes/other.php');
 

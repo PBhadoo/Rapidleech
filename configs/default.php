@@ -23,7 +23,7 @@ $default_options = array(
 'login' => false, # false - Authorization mode is off, true - on
 'users' => array('test' => 'test'), # false - Authorization mode is off, enter the username and password in the given way
 //Presentation
-'template_used' => 'plugmod',
+'template_used' => 'flavor',
 'default_language' => 'en',
 'show_all' => true, # true - To show all files in the catalog, false to hide it
 'server_info' => true, # CPU, Memory & Time Info
